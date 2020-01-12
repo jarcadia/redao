@@ -5,9 +5,10 @@ import java.io.IOException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class RedisValueFormatter {
+class RedisValueFormatter {
 
     private final ObjectMapper mapper;
 
@@ -42,6 +43,15 @@ public class RedisValueFormatter {
         }
     }
     
+    protected JsonNode asNode(String json) {
+        try {
+            return mapper.readTree(json);
+        }
+        catch (IOException e) {
+            throw new RedisException("Unable to parse JSON", e);
+        }
+    }
+    
     protected String serialize(Object obj) {
         try {
             return mapper.writeValueAsString(obj);
@@ -50,20 +60,19 @@ public class RedisValueFormatter {
             throw new RedisException("Unable to serialize to JSON", e);
         }
     }
-    
+
     protected String smartSerailize(Object value) {
-        if (value instanceof String) {
-            return (String) value;
-        } else if (value instanceof Integer) {
-            return String.valueOf((Integer) value);
-        } else if (value instanceof Long) {
-            return String.valueOf((Long) value);
-        } else if (value instanceof Double) {
-            return String.valueOf((Double) value);
-        } else if (value instanceof Enum) {
-            return ((Enum<?>) value).name();
-        } else {
+//        if (value instanceof String) {
+//            return (String) value;
+//        } else if (value instanceof Integer) {
+//            return String.valueOf((Integer) value);
+//        } else if (value instanceof Long) {
+//            return String.valueOf((Long) value);
+//        } else if (value instanceof Double) {
+//            return String.valueOf((Double) value);
+//        } else {
             return this.serialize(value);
-        }
+//        }
     }
+    
 }

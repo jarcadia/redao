@@ -1,8 +1,11 @@
 package com.jarcadia.rcommando;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import io.lettuce.core.KeyValue;
 
 public class RedisCdl {
     
@@ -23,7 +26,17 @@ public class RedisCdl {
         args.put("remaining",  String.valueOf(count));
         rcommando.core().hmset(this.hashKey, args);
     }
-    
+
+    public boolean decrement() {
+        long remaining = rcommando.core().hincrby(this.hashKey, "remaining", -1);
+        if (remaining == 0) {
+            rcommando.core().del(this.hashKey);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     public Optional<RedisValue> decrement(String field) {
         long remaining = rcommando.core().hincrby(this.hashKey, "remaining", -1);
         if (remaining == 0) {
@@ -37,10 +50,9 @@ public class RedisCdl {
     public Optional<RedisValues> decrement(String... fields) {
         long remaining = rcommando.core().hincrby(this.hashKey, "remaining", -1);
         if (remaining == 0) {
-            RedisValues values = new RedisValues(formatter);
-            rcommando.core().hmget(values.getChannel(), this.hashKey, fields);
+            List<KeyValue<String, String>> values = rcommando.core().hmget(this.hashKey, fields);
             rcommando.core().del(this.hashKey);
-            return Optional.of(values);
+            return Optional.of(new RedisValues(formatter, values.iterator()));
         }
         return Optional.empty();
     }

@@ -15,7 +15,7 @@ public class RedisSubscription {
     private final String channel;
     private final CompletableFuture<Void> unsubscribeFuture;
     
-    protected RedisSubscription(StatefulRedisPubSubConnection<String, String> pubsubConnection, RedisValueFormatter formatter, String channel, Consumer<RedisValue> consumer) {
+    protected RedisSubscription(StatefulRedisPubSubConnection<String, String> pubsubConnection, RedisValueFormatter formatter, String channel, Consumer<String> consumer) {
         this.channel = channel;
         this.unsubscribeFuture = new CompletableFuture<>();
         this.pubsubConnection = pubsubConnection;
@@ -25,7 +25,7 @@ public class RedisSubscription {
 
             @Override
             public void message(String channel, String message) {
-                consumer.accept(new RedisValue(formatter, message));
+                consumer.accept(message);
             }
 
             @Override
@@ -55,7 +55,7 @@ public class RedisSubscription {
         sync.subscribe(channel);
     }
     
-    public void unsubscribe() throws InterruptedException, ExecutionException {
+    public void close() throws InterruptedException, ExecutionException {
         sync.unsubscribe(channel);
         unsubscribeFuture.get();
         pubsubConnection.close();

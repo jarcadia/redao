@@ -1,25 +1,21 @@
 package com.jarcadia.rcommando;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Iterator;
 
-import io.lettuce.core.output.KeyValueStreamingChannel;
+import io.lettuce.core.KeyValue;
 
 public class RedisValues {
     
-    private final Map<String, RedisValue> values;
-    private final KeyValueStreamingChannel<String, String> channel;
+    private final RedisValueFormatter formatter;
+    private final Iterator<KeyValue<String, String>> iter;
     
-    protected RedisValues(RedisValueFormatter formatter) {
-        this.values = new HashMap<>();
-        this.channel = (key, value) -> values.put(key, new RedisValue(formatter, value));
+    protected RedisValues(RedisValueFormatter formatter, Iterator<KeyValue<String, String>> iter) {
+        this.formatter = formatter;
+        this.iter = iter;
     }
     
-    protected KeyValueStreamingChannel<String, String> getChannel() {
-        return this.channel;
-    }
-    
-    public RedisValue get(String field) {
-        return values.get(field);
+    public RedisValue next() {
+        KeyValue<String, String> val = iter.next();
+        return new RedisValue(formatter, val.getValue());
     }
 }
