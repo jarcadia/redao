@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.lettuce.core.RedisClient;
+import io.lettuce.core.ScriptOutputType;
 
 public class RedisCommandoUnitTest {
 
@@ -49,14 +50,14 @@ public class RedisCommandoUnitTest {
 
     @Test
     void basicObjInit() {
-        Assertions.assertTrue(objs.get("obj").init());
-        Assertions.assertFalse(objs.get("obj").init());
+        Assertions.assertTrue(objs.get("obj").checkedTouch());
+        Assertions.assertFalse(objs.get("obj").checkedTouch());
     }
 
     @Test
     void lotsOfObjectIds() {
         rcommando.core().del("objs");
-        IntStream.range(0, 1000).forEach(b -> objs.get(String.valueOf(b)).init());
+        IntStream.range(0, 1000).forEach(b -> objs.get(String.valueOf(b)).checkedTouch());
         Assertions.assertEquals(499500, objs.stream().mapToInt(s -> Integer.parseInt(s.getId())).sum(), "All object IDs are accounted for");
         rcommando.core().del("objs");
     }
@@ -64,9 +65,9 @@ public class RedisCommandoUnitTest {
     @Test
     void addingAndRemovingObjectIds() {
         rcommando.core().del("objs");
-        objs.get("a").init();
-        objs.get("b").init();
-        objs.get("c").init();
+        objs.get("a").checkedTouch();
+        objs.get("b").checkedTouch();
+        objs.get("c").checkedTouch();
 
         List<String> list = objs.stream().map(obj -> obj.getId()).sorted().collect(Collectors.toList());
         Assertions.assertIterableEquals(Arrays.asList("a", "b", "c"), list);
@@ -76,7 +77,7 @@ public class RedisCommandoUnitTest {
     @Test
     void testStringProperty() {
         RedisObject obj = objs.get("a");
-        obj.set("name", "Alpha");
+        obj.checkedSet("name", "Alpha");
         Assertions.assertEquals("a", objs.stream().findFirst().get().getId());
         Assertions.assertEquals("Alpha", obj.get("name").asString());
     }
@@ -84,7 +85,7 @@ public class RedisCommandoUnitTest {
     @Test
     void testIntProperty() {
         RedisObject obj = objs.get("a");
-        obj.set("age", 23);
+        obj.checkedSet("age", 23);
         Assertions.assertEquals(23, obj.get("age").asInt(), "Expected value is an integer");
     }
 
@@ -95,7 +96,7 @@ public class RedisCommandoUnitTest {
     @Test
     void testEnumProperty() {
         RedisObject obj = objs.get("a");
-        obj.set("greeting", TestEnum.HELLO);
+        obj.checkedSet("greeting", TestEnum.HELLO);
         Assertions.assertEquals(TestEnum.HELLO, obj.get("greeting").as(TestEnum.class));
     }
 
@@ -103,7 +104,7 @@ public class RedisCommandoUnitTest {
     void testListOfPrimitivesProperty() {
         List<String> values = Arrays.asList("hello", "world");
         RedisObject obj = objs.get("a");
-        obj.set("values", values);
+        obj.checkedSet("values", values);
         List<String> readBack = obj.get("values").asListOf(String.class);
         Assertions.assertIterableEquals(values, readBack);
     }
@@ -112,7 +113,7 @@ public class RedisCommandoUnitTest {
     void testListOfPojos() {
         List<PersonPojo> values = Arrays.asList(new PersonPojo("John Doe", 30), new PersonPojo("Jane Doe", 35));
         RedisObject obj = objs.get("a");
-        obj.set("values", values);
+        obj.checkedSet("values", values);
         List<PersonPojo> readBack = obj.get("values").asListOf(PersonPojo.class);
         Assertions.assertIterableEquals(values, readBack);
     }
@@ -130,19 +131,21 @@ public class RedisCommandoUnitTest {
     void checkedInitWorks() throws InterruptedException, ExecutionException {
         final AtomicReference<String> change = new AtomicReference<>();
         RedisSubscription subscription = rcommando.subscribe("objs.change", val -> change.set(val));
-        Assertions.assertTrue(objs.get("a").checkedInit());
+        Assertions.assertTrue(objs.get("a").checkedTouch());
         Thread.sleep(10);
         Assertions.assertEquals("{\"a\":{\"v\":1}}", change.get());
     }
 
     @Test
     void checkedSetOnExistingObject() throws InterruptedException, ExecutionException {
+
+        RedisObject obj = objs.get("a");
+        obj.checkedSet("val", 42);
+        Assertions.assertEquals(42, obj.get("val").asInt());
+
         final AtomicReference<String> change = new AtomicReference<>();
         RedisSubscription subscription = rcommando.subscribe("objs.change", val -> change.set(val));
 
-        RedisObject obj = objs.get("a");
-        obj.set("val", 42);
-        Assertions.assertEquals(42, obj.get("val").asInt());
         Optional<CheckedSetSingleFieldResult> changes =  obj.checkedSet("val", "hello");
         Assertions.assertEquals(2, obj.getVersion());
         Assertions.assertEquals("hello", obj.get("val").asString());
@@ -164,7 +167,7 @@ public class RedisCommandoUnitTest {
         Assertions.assertEquals(100, obj.get("val").asInt());
         Assertions.assertTrue(changes.isPresent());
         Assertions.assertEquals("val", changes.get().getField());
-        Assertions.assertTrue(changes.get().getBefore().isNull());
+        Assertions.assertFalse(changes.get().getBefore().isPresent());
         Assertions.assertEquals("100", changes.get().getAfter().asString());
 
         subscription.close();
@@ -196,7 +199,7 @@ public class RedisCommandoUnitTest {
         Assertions.assertEquals("Hello\nWorld", obj.get("val").asString());
         Assertions.assertTrue(changes.isPresent());
         Assertions.assertEquals("val", changes.get().getField());
-        Assertions.assertTrue(changes.get().getBefore().isNull());
+        Assertions.assertFalse(changes.get().getBefore().isPresent());
         Assertions.assertEquals("Hello\nWorld", changes.get().getAfter().asString());
 
         subscription.close();
@@ -216,11 +219,11 @@ public class RedisCommandoUnitTest {
         Assertions.assertEquals(2, changes.get().getChanges().size());
 
         Assertions.assertEquals("str", changes.get().getChanges().get(0).getField());
-        Assertions.assertTrue(changes.get().getChanges().get(0).getBefore().isNull());
+        Assertions.assertFalse(changes.get().getChanges().get(0).getBefore().isPresent());
         Assertions.assertEquals("hello", changes.get().getChanges().get(0).getAfter().asString());
 
         Assertions.assertEquals("int", changes.get().getChanges().get(1).getField());
-        Assertions.assertTrue(changes.get().getChanges().get(1).getBefore().isNull());
+        Assertions.assertFalse(changes.get().getChanges().get(1).getBefore().isPresent());
         Assertions.assertEquals(42, changes.get().getChanges().get(1).getAfter().asInt());
 
         subscription.close();
@@ -233,7 +236,7 @@ public class RedisCommandoUnitTest {
         RedisSubscription subscription = rcommando.subscribe("objs.change", val -> change.set(val));
         
         RedisObject obj = objs.get("a");
-        obj.init();
+        obj.checkedTouch();
         boolean deleted = obj.checkedDelete();
         Assertions.assertTrue(deleted);
 
@@ -249,10 +252,10 @@ public class RedisCommandoUnitTest {
         final AtomicReference<String> change = new AtomicReference<>();
         RedisSubscription subscription = rcommando.subscribe("objs.change", val -> change.set(val));
         
-        objs.get("a").init();
+        objs.get("a").checkedTouch();
 
         RedisObject obj = objs.get("b");
-        obj.init();
+        obj.checkedTouch();
         boolean deleted = obj.checkedDelete();
         Assertions.assertTrue(deleted);
 
@@ -264,10 +267,11 @@ public class RedisCommandoUnitTest {
 
     @Test
     void checkedDeleteNonExist() throws InterruptedException, ExecutionException {
+        objs.get("a").checkedTouch();
+
         final AtomicReference<String> change = new AtomicReference<>();
         RedisSubscription subscription = rcommando.subscribe("objs.change", val -> change.set(val));
         
-        objs.get("a").init();
         boolean deleted = objs.get("b").checkedDelete();
         Assertions.assertFalse(deleted);
 
@@ -295,17 +299,17 @@ public class RedisCommandoUnitTest {
         RedisSubscription subscription = rcommando.subscribe("objs.change", val -> change.set(val));
         
         RedisObject obj = objs.get("a");
-        obj.set("name", "John Doe");
-        obj.set("age", 23);
+        obj.checkedSet("name", "John Doe");
+        obj.checkedSet("age", 23);
         Optional<CheckedSetSingleFieldResult> result = obj.checkedClear("age");
         Assertions.assertTrue(result.isPresent());
         Assertions.assertEquals("age", result.get().getField());
         Assertions.assertEquals(23, result.get().getBefore().asInt());
-        Assertions.assertTrue(result.get().getAfter().isNull());
+        Assertions.assertFalse(result.get().getAfter().isPresent());
         subscription.close();
         
-        Assertions.assertTrue(obj.get("age").isNull());
-        Assertions.assertEquals("{\"a\":{\"v\":3,\"age\":null}", change.get());
+        Assertions.assertFalse(obj.get("age").isPresent());
+        Assertions.assertEquals("{\"a\":{\"v\":3,\"age\":null}}", change.get());
     }
     
     @Test

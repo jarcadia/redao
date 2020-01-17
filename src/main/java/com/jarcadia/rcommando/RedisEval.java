@@ -13,7 +13,6 @@ public class RedisEval {
     private final RedisCommando rcommando;
     private final RedisValueFormatter formatter;
     private String script;
-    private String scriptFile;
     private final List<String> keys;
     private final List<String> args;
     private final String[] arrayRef = new String[0];
@@ -27,16 +26,11 @@ public class RedisEval {
         this.listTypeRef = new TypeReference<List<String>>() {};
     }
 
-    public RedisEval useScriptFile(String scriptFile) {
-        this.scriptFile = scriptFile;
-        return this;
-    }
-
-    public RedisEval setScript(String script) {
+    public RedisEval cachedScript(String script) {
         this.script = script;
         return this;
     }
-    
+
     public RedisEval appendScript(String script) {
         this.script = this.script == null ? script : this.script + script;
         return this;
@@ -143,9 +137,7 @@ public class RedisEval {
     }
     
     private <T> T execute(ScriptOutputType outputType) {
-        String digest = script != null ?
-                rcommando.getScriptDigest(script) :
-                rcommando.getScriptFileDigest(scriptFile);
+        String digest = rcommando.getScriptDigest(script);
         return rcommando.core().evalsha(digest, outputType, keys(), args());
     }
     

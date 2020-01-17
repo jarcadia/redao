@@ -25,6 +25,10 @@ public class RedisMap implements Iterable<RedisObject> {
         return rcommando.core().scard(setKey);
     }
 
+    public boolean has(String id) {
+        return rcommando.core().sismember(setKey, id);
+    }
+
     @Override
     public Iterator<RedisObject> iterator() {
         return new RedisObjectStreamer();

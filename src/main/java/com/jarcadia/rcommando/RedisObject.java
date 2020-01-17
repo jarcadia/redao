@@ -2,9 +2,11 @@ package com.jarcadia.rcommando;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -49,26 +51,15 @@ public class RedisObject {
         return  new RedisValues(formatter, values.iterator());
     }
 
-    public boolean init() {
-        return rcommando.eval()
-            .useScriptFile("objInit")
-            .addKeys(this.mapKey, this.hashKey)
-            .returnLong() == 1L;
-    }
-
     public void set(Object... fieldsAndValues) {
-        rcommando.eval()
-                .useScriptFile("objSet")
-                .addKeys(this.mapKey, this.hashKey)
-                .addArgs(prepareArgs(fieldsAndValues))
-                .returnStatus();
+    	rcommando.core().hmset(this.hashKey, prepareArgsAsMap(fieldsAndValues));
     }
     
     public Optional<CheckedSetSingleFieldResult> checkedSet(String field, Object value) {
         List<String> bulkChanges = rcommando.eval()
-                .useScriptFile("objCheckedSet")
+                .cachedScript(Scripts.OBJ_CHECKED_SET)
                 .addKeys(this.mapKey, this.hashKey, this.mapKey+".change")
-                .addArgs(prepareArgs(new Object[] {field, value}))
+                .addArgs(prepareArgsAsArray(new Object[] {field, value}))
                 .returnMulti();
 
         if (bulkChanges.size() == 4) {
@@ -84,11 +75,11 @@ public class RedisObject {
 
     public Optional<CheckedSetMultiFieldResult> checkedSet(String field, Object value, Object... fieldsAndValues) {
         List<String> bulkChanges = rcommando.eval()
-                .useScriptFile("objCheckedSet")
+                .cachedScript(Scripts.OBJ_CHECKED_SET)
                 .addKeys(this.mapKey, this.hashKey, this.mapKey+".change")
-                .addArg(field)
+                .addArgs(field)
                 .addArg(value)
-                .addArgs(prepareArgs(fieldsAndValues))
+                .addArgs(prepareArgsAsArray(fieldsAndValues))
                 .returnMulti();
 
         if (bulkChanges.size() > 0) {
@@ -127,20 +118,20 @@ public class RedisObject {
         }
     }
 
-    public boolean checkedInit() {
-        boolean init = rcommando.eval()
-            .useScriptFile("objCheckedInit")
+    public boolean checkedTouch() {
+        boolean created = rcommando.eval()
+            .cachedScript(Scripts.OBJ_CHECKED_TOUCH)
             .addKeys(this.mapKey, this.hashKey, this.mapKey + ".change")
             .returnLong() == 1L;
-        if (init) {
+        if (created) {
             rcommando.invokeCheckedInsertHandlers(mapKey, id);
         }
-        return init;
+        return created;
     }
 
     public boolean checkedDelete() {
         int numDeleted = rcommando.eval()
-                .useScriptFile("objCheckedDelete")
+                .cachedScript(Scripts.OBJ_CHECKED_DELETE)
                 .addKeys(this.mapKey, this.hashKey, this.mapKey + ".change")
                 .addArgs(this.id)
                 .returnInt();
@@ -155,7 +146,7 @@ public class RedisObject {
 
     public Optional<CheckedSetSingleFieldResult> checkedClear(String field) {
         List<String> bulkChanges = rcommando.eval()
-                .useScriptFile("objClear")
+                .cachedScript(Scripts.OBJ_CHECKED_DEL_FIELD)
                 .addKeys(this.mapKey, this.hashKey, this.mapKey+".change")
                 .addArgs(new String[] {field})
                 .returnMulti();
@@ -173,7 +164,7 @@ public class RedisObject {
 
     public Optional<CheckedSetMultiFieldResult> checkedClear(String field, String... fields) {
         List<String> bulkChanges = rcommando.eval()
-                .useScriptFile("objClear")
+                .cachedScript(Scripts.OBJ_CHECKED_DEL_FIELD)
                 .addKeys(this.mapKey, this.hashKey, this.mapKey+".change")
                 .addArg(field)
                 .addArgs(fields)
@@ -197,7 +188,7 @@ public class RedisObject {
         }
     }
     
-    private String[] prepareArgs(Object[] fieldsAndValues) {
+    private String[] prepareArgsAsArray(Object[] fieldsAndValues) {
         String[] args = new String[fieldsAndValues.length];
         if (args.length % 2 != 0) {
             throw new IllegalArgumentException("A value must be specified for each field name");
@@ -217,14 +208,30 @@ public class RedisObject {
         }
         return args;
     }
+    
+    private Map<String, String> prepareArgsAsMap(Object[] fieldsAndValues) {
+        if (fieldsAndValues.length % 2 != 0) {
+            throw new IllegalArgumentException("A value must be specified for each field name");
+        }
+        Map<String, String> args = new LinkedHashMap<>();
+        for (int i=0; i<fieldsAndValues.length; i+=2) {
+            if (i % 2 == 0) {
+                // Process field
+                if (fieldsAndValues[i] instanceof String) {
+                    String key = (String) fieldsAndValues[i];
+                    String value = formatter.smartSerailize(fieldsAndValues[i+1]);
+                    args.put(key, value);
+                } else {
+                    throw new IllegalArgumentException("Field name is set operation must be a String");
+                }
+            }
+        }
+        return args;
+    }
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((id == null) ? 0 : id.hashCode());
-        result = prime * result + ((mapKey == null) ? 0 : mapKey.hashCode());
-        return result;
+    	return Objects.hash(mapKey, id);
     }
 
     @Override

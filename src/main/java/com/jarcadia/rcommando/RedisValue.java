@@ -24,16 +24,12 @@ public class RedisValue {
         this.value = value;
     }
     
-    public boolean isNull() {
-        return value == null;
+    public boolean isPresent() {
+        return value != null;
     }
 
     public String asString() {
         return formatter.deserialize(value, String.class);
-    }
-
-    public Optional<String> asOptionalString() {
-        return value == null ? Optional.empty() : Optional.of(formatter.deserialize(value, String.class));
     }
 
     public int asInt() {
@@ -55,6 +51,11 @@ public class RedisValue {
     public <T> List<T> asListOf(Class<T> clazz) {
         CollectionType typeReference = TypeFactory.defaultInstance().constructCollectionType(List.class, clazz);
         return formatter.deserialize(value, typeReference);
+    }
+    
+    public RedisObject asRedisObject(RedisMap map) {
+        String id = this.asString();
+        return map.get(id);
     }
     
     public List<RedisObject> asObjectList(RedisMap map) {

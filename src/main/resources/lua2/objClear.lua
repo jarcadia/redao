@@ -16,11 +16,8 @@ end
 if (changed) then
 	local id = string.sub(KEYS[2], string.len(KEYS[1]) + 2);
 	local ver = redis.call('hincrby', KEYS[2], 'v', 1);
-	-- update['v'] = ver;
 	table.insert(cleared, 1, tostring(ver));
-
-
-	redis.call('publish', KEYS[3], '{"' .. id .. '":{"v":'.. ver .. update .. '}');
+	redis.call('publish', KEYS[3], '{"' .. id .. '":{"v":'.. ver .. update .. '}}');
 end
 return cleared;
 

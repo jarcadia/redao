@@ -1,7 +1,8 @@
 package com.jarcadia.rcommando;
 
-import java.io.File;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashSet;
@@ -71,10 +72,10 @@ public class RedisCommando {
         Set<String> result = new HashSet<>();
         String tempSetKey = UUID.randomUUID().toString();
         List<String> duplicates =  eval()
-              .useScriptFile("mergeIntoSetIfDistinct")
-              .addKeys(setKey, tempSetKey)
-              .addArgs(values)
-              .returnMulti();
+        		.cachedScript(Scripts.MERGE_INTO_SET_IF_DISTINCT)
+        		.addKeys(setKey, tempSetKey)
+        		.addArgs(values)
+        		.returnMulti();
         result.addAll(duplicates);
         return result;
     }
@@ -96,27 +97,7 @@ public class RedisCommando {
     }
 
     protected String getScriptDigest(String script) {
-        String digest = scriptCache.get(script);
-        if (digest == null) {
-            digest = commands.scriptLoad(script);
-            scriptCache.put(script, digest);
-        }
-        return digest;
-    }
-
-    protected String getScriptFileDigest(String scriptName) {
-        String digest = scriptCache.get(scriptName);
-        if (digest == null) {
-            try {
-                File file = new File(getClass().getClassLoader().getResource("lua/" + scriptName + ".lua").getFile());
-                String script = new String(Files.readAllBytes(file.toPath()));
-                digest = commands.scriptLoad(script);
-                scriptCache.put(script, digest);
-            } catch (IOException ex) {
-                throw new RedisException("Unable to load lua script from classpath://lua/" + scriptName + ".lua", ex);
-            }
-        }
-        return digest;
+        return scriptCache.computeIfAbsent(script, s -> commands.scriptLoad(s));
     }
 
     public void close() {
