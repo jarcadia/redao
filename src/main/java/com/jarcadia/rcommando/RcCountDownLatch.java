@@ -7,18 +7,16 @@ import java.util.Optional;
 
 import io.lettuce.core.KeyValue;
 
-public class RedisCdl {
+public class RcCountDownLatch {
     
     private final RedisCommando rcommando;
     private final RedisValueFormatter formatter;
     private final String hashKey;
-    private final String id;
     
-    public RedisCdl(RedisCommando rcommando, RedisValueFormatter formatter, String id) {
+    public RcCountDownLatch(RedisCommando rcommando, RedisValueFormatter formatter, String id) {
         this.rcommando = rcommando;
         this.formatter = formatter;
         this.hashKey =  "cdl." + id;
-        this.id = id;
     }
     
     public void init(int count, Object... fieldsAndValues) {
@@ -37,22 +35,22 @@ public class RedisCdl {
         }
     }
 
-    public Optional<RedisValue> decrement(String field) {
+    public Optional<RcValue> decrement(String field) {
         long remaining = rcommando.core().hincrby(this.hashKey, "remaining", -1);
         if (remaining == 0) {
-            RedisValue value = new RedisValue(formatter, rcommando.core().hget(hashKey, field));
+            RcValue value = new RcValue(formatter, rcommando.core().hget(hashKey, field));
             rcommando.core().del(this.hashKey);
             return Optional.of(value);
         }
         return Optional.empty();
     }
 
-    public Optional<RedisValues> decrement(String... fields) {
+    public Optional<RcValues> decrement(String... fields) {
         long remaining = rcommando.core().hincrby(this.hashKey, "remaining", -1);
         if (remaining == 0) {
             List<KeyValue<String, String>> values = rcommando.core().hmget(this.hashKey, fields);
             rcommando.core().del(this.hashKey);
-            return Optional.of(new RedisValues(formatter, values.iterator()));
+            return Optional.of(new RcValues(formatter, values.iterator()));
         }
         return Optional.empty();
     }
@@ -66,7 +64,7 @@ public class RedisCdl {
             if (!(fieldsAndValues[i] instanceof String)) {
                 throw new IllegalArgumentException("Field name must be a String");
             }
-            args.put((String) fieldsAndValues[i], formatter.smartSerailize(fieldsAndValues[i+1]));
+            args.put((String) fieldsAndValues[i], formatter.serialize(fieldsAndValues[i+1]));
         }
         return args;
     }

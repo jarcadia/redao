@@ -2,16 +2,16 @@ package com.jarcadia.rcommando;
 
 public class CheckedSetSingleFieldResult {
 
-    private final String mapKey;
+    private final String setKey;
     private final String id;
     private final long version;
     private final String field;
-    private final RedisValue before;
-    private final RedisValue after;
+    private final RcValue before;
+    private final RcValue after;
     private final boolean isInsert;
 
-    public CheckedSetSingleFieldResult(String mapKey, String id, long version, String field, RedisValue before, RedisValue after) {
-        this.mapKey = mapKey;
+    public CheckedSetSingleFieldResult(String setKey, String id, long version, String field, RcValue before, RcValue after) {
+        this.setKey = setKey;
         this.id = id;
         this.version = version;
         this.field = field;
@@ -20,8 +20,8 @@ public class CheckedSetSingleFieldResult {
         this.isInsert = version == 1L;
     }
 
-    public String getMapKey() {
-        return mapKey;
+    public String getSetKey() {
+        return setKey;
     }
 
     public String getId() {
@@ -36,11 +36,11 @@ public class CheckedSetSingleFieldResult {
         return field;
     }
 
-    public RedisValue getBefore() {
+    public RcValue getBefore() {
         return before;
     }
 
-    public RedisValue getAfter() {
+    public RcValue getAfter() {
         return after;
     }
 

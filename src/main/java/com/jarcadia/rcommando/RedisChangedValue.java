@@ -3,10 +3,10 @@ package com.jarcadia.rcommando;
 public class RedisChangedValue {
 
     private final String field;
-    private final RedisValue before;
-    private final RedisValue after;
+    private final RcValue before;
+    private final RcValue after;
 
-    protected RedisChangedValue(String field, RedisValue before, RedisValue after) {
+    protected RedisChangedValue(String field, RcValue before, RcValue after) {
         this.field = field;
         this.before = before;
         this.after = after;
@@ -16,11 +16,11 @@ public class RedisChangedValue {
         return field;
     }
 
-    public RedisValue getBefore() {
+    public RcValue getBefore() {
         return before;
     }
 
-    public RedisValue getAfter() {
+    public RcValue getAfter() {
         return after;
     }
 }

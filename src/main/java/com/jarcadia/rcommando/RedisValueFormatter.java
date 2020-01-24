@@ -16,30 +16,30 @@ class RedisValueFormatter {
         this.mapper = mapper;
     }
 
-    protected <T> T deserialize(String json, Class<T> clazz) {
+    protected <T> T deserialize(String json, Class<T> clazz) throws RcDeserializationException {
         try {
             return mapper.readValue(json, clazz);
         }
         catch (IOException e) {
-            throw new RedisException("Unable to deserialize JSON to " + clazz.getSimpleName(), e);
+            throw new RcDeserializationException("Unable to deserialize JSON to " + clazz.getSimpleName(), e);
         }
     }
     
-    protected <T> T deserialize(String json, TypeReference<T> typeRef) {
+    protected <T> T deserialize(String json, TypeReference<T> typeRef) throws RcDeserializationException {
         try {
             return mapper.readValue(json, typeRef);
         }
         catch (IOException e) {
-            throw new RedisException("Unable to deserialize JSON", e);
+            throw new RcDeserializationException("Unable to deserialize JSON", e);
         }
     }
     
-    protected <T> T deserialize(String json, JavaType type) {
+    protected <T> T deserialize(String json, JavaType type) throws RcDeserializationException {
         try {
             return mapper.readValue(json, type);
         }
         catch (IOException e) {
-            throw new RedisException("Unable to deserialize JSON", e);
+            throw new RcDeserializationException("Unable to deserialize JSON", e);
         }
     }
     
@@ -48,7 +48,7 @@ class RedisValueFormatter {
             return mapper.readTree(json);
         }
         catch (IOException e) {
-            throw new RedisException("Unable to parse JSON", e);
+            throw new RcException("Unable to parse JSON", e);
         }
     }
     
@@ -57,22 +57,7 @@ class RedisValueFormatter {
             return mapper.writeValueAsString(obj);
         }
         catch (JsonProcessingException e) {
-            throw new RedisException("Unable to serialize to JSON", e);
+            throw new RcException("Unable to serialize to JSON", e);
         }
     }
-
-    protected String smartSerailize(Object value) {
-//        if (value instanceof String) {
-//            return (String) value;
-//        } else if (value instanceof Integer) {
-//            return String.valueOf((Integer) value);
-//        } else if (value instanceof Long) {
-//            return String.valueOf((Long) value);
-//        } else if (value instanceof Double) {
-//            return String.valueOf((Double) value);
-//        } else {
-            return this.serialize(value);
-//        }
-    }
-    
 }

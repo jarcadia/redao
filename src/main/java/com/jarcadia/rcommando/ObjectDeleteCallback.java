@@ -1,7 +1,7 @@
 package com.jarcadia.rcommando;
 
 @FunctionalInterface
-public interface CheckedDeleteHandler {
+public interface ObjectDeleteCallback {
 
     public void onDelete(String mapKey, String id);
 

@@ -1,7 +1,7 @@
 package com.jarcadia.rcommando;
 
 
-public class Scripts {
+class Scripts {
 	
 	protected static String OBJ_CHECKED_TOUCH = """
         --Keys setKey, objKey, changeChannelKey

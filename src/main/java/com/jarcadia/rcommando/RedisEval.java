@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 
+import io.lettuce.core.RedisNoScriptException;
 import io.lettuce.core.ScriptOutputType;
 
 public class RedisEval {
@@ -56,7 +57,11 @@ public class RedisEval {
     }
     
     public RedisEval deserializeAndAddKeys(String serializedKeys) {
-        keys.addAll(formatter.deserialize(serializedKeys, listTypeRef));
+        try {
+			keys.addAll(formatter.deserialize(serializedKeys, listTypeRef));
+		} catch (RcDeserializationException e) {
+			throw new RcException("Unable to deserialize " + serializedKeys + " as List<String>");
+		}
         return this;
     }
     
@@ -137,8 +142,7 @@ public class RedisEval {
     }
     
     private <T> T execute(ScriptOutputType outputType) {
-        String digest = rcommando.getScriptDigest(script);
-        return rcommando.core().evalsha(digest, outputType, keys(), args());
+    	return rcommando.executeScript(script, outputType, keys(), args());
     }
     
     protected String[] keys() {

@@ -1,7 +1,7 @@
 package com.jarcadia.rcommando;
 
 @FunctionalInterface
-public interface CheckedInsertHandler {
+public interface ObjectInsertCallback {
 
     public void onInsert(String mapKey, String id);
 
