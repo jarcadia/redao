@@ -5,21 +5,23 @@ import java.util.Collection;
 import java.util.List;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.jarcadia.rcommando.exception.RcDeserializationException;
+import com.jarcadia.rcommando.exception.RedisCommandoException;
 
 import io.lettuce.core.RedisNoScriptException;
 import io.lettuce.core.ScriptOutputType;
 
-public class RedisEval {
+public class Eval {
     
     private final RedisCommando rcommando;
-    private final RedisValueFormatter formatter;
+    private final ValueFormatter formatter;
     private String script;
     private final List<String> keys;
     private final List<String> args;
     private final String[] arrayRef = new String[0];
     private final TypeReference<List<String>> listTypeRef;
     
-    protected RedisEval(RedisCommando rcommando, RedisValueFormatter formatter) {
+    protected Eval(RedisCommando rcommando, ValueFormatter formatter) {
         this.rcommando = rcommando;
         this.formatter = formatter;
         this.keys = new ArrayList<>();
@@ -27,78 +29,78 @@ public class RedisEval {
         this.listTypeRef = new TypeReference<List<String>>() {};
     }
 
-    public RedisEval cachedScript(String script) {
+    public Eval cachedScript(String script) {
         this.script = script;
         return this;
     }
 
-    public RedisEval appendScript(String script) {
+    public Eval appendScript(String script) {
         this.script = this.script == null ? script : this.script + script;
         return this;
     }
     
-    public RedisEval addKey(String key) {
+    public Eval addKey(String key) {
         keys.add(key);
         return this;
     }
     
-    public RedisEval addKeys(String... keys) {
+    public Eval addKeys(String... keys) {
         for (String key : keys) {
             this.keys.add(key);
         }
         return this;
     }
     
-    public RedisEval addKeys(List<String> keys) {
+    public Eval addKeys(List<String> keys) {
         for (String key : keys) {
             this.keys.add(key);
         }
         return this;
     }
     
-    public RedisEval deserializeAndAddKeys(String serializedKeys) {
+    public Eval deserializeAndAddKeys(String serializedKeys) {
         try {
 			keys.addAll(formatter.deserialize(serializedKeys, listTypeRef));
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + serializedKeys + " as List<String>");
+			throw new RedisCommandoException("Unable to deserialize " + serializedKeys + " as List<String>");
 		}
         return this;
     }
     
     
-    public RedisEval addArg(String arg) {
+    public Eval addArg(String arg) {
         this.args.add(arg);
         return this;
     }
     
-    public RedisEval addArg(double arg) {
+    public Eval addArg(double arg) {
         this.args.add(String.valueOf(arg));
         return this;
     }
     
-    public RedisEval addArg(int arg) {
+    public Eval addArg(int arg) {
         this.args.add(String.valueOf(arg));
         return this;
     }
     
-    public RedisEval addArg(long arg) {
+    public Eval addArg(long arg) {
         this.args.add(String.valueOf(arg));
         return this;
     }
     
-    public RedisEval addArgs(String... args) {
+    public Eval addArgs(String... args) {
         for (String arg : args) {
             this.args.add(arg);
         }
         return this;
     }
     
-    public RedisEval addArgs(Collection<String> args) {
+    public Eval addArgs(Collection<String> args) {
         this.args.addAll(args);
         return this;
     }
     
-    public RedisEval addArg(Object toSerialize) {
+    public Eval addArg(Object toSerialize) {
         this.args.add(formatter.serialize(toSerialize));
         return this;
     }

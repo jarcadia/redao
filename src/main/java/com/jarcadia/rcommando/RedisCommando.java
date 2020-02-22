@@ -1,5 +1,6 @@
 package com.jarcadia.rcommando;
 
+import java.lang.reflect.Proxy;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -13,6 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jarcadia.rcommando.callbacks.DaoDeleteCallback;
+import com.jarcadia.rcommando.callbacks.DaoInsertCallback;
+import com.jarcadia.rcommando.callbacks.DaoValueChangeCallback;
+import com.jarcadia.rcommando.proxy.DaoProxy;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisNoScriptException;
@@ -26,28 +31,32 @@ public class RedisCommando {
     
     private final RedisClient redis;
     private final ObjectMapper objectMapper;
-    private final RedisValueFormatter formatter;
+    private final ValueFormatter formatter;
+    private final ProxyMetadataFactory proxyMetadataFactory;
     private final StatefulRedisConnection<String, String> connection;
     private final RedisCommands<String, String> commands;
     private final Map<String, String> scriptCache;
-    private final Map<String, Set<ObjectInsertCallback>> insertCallbackMap;
-    private final Map<String, Set<ObjectDeleteCallback>> deleteCallbackMap;
-    private final Map<String, Map<String, Set<FieldChangeCallback>>> changeCallbackMap;
-    
+    private final Map<String, Set<DaoInsertCallback>> insertCallbackMap;
+    private final Map<String, Set<DaoDeleteCallback>> deleteCallbackMap;
+    private final Map<String, Map<String, Set<DaoValueChangeCallback>>> changeCallbackMap;
+    private final Map<Class<? extends DaoProxy>, ProxyMetadata> proxyMetadataMap;
+
     public static RedisCommando create(RedisClient client) {
         return new RedisCommando(client);
     }
 
     RedisCommando(RedisClient redis) {
         this.redis = redis;
-    	this.objectMapper = new RcObjectMapper(this);
-    	this.formatter = new RedisValueFormatter(objectMapper);
+    	this.objectMapper = new RedisCommandoObjectMapper(this);
+    	this.formatter = new ValueFormatter(objectMapper);
+    	this.proxyMetadataFactory = new ProxyMetadataFactory(objectMapper);
         this.connection = redis.connect();
         this.commands = connection.sync();
         this.scriptCache = new ConcurrentHashMap<>();
         this.insertCallbackMap = new ConcurrentHashMap<>();
         this.deleteCallbackMap = new ConcurrentHashMap<>();
         this.changeCallbackMap = new ConcurrentHashMap<>();
+        this.proxyMetadataMap = new ConcurrentHashMap<>();
     }
 
     public RedisCommando clone() {
@@ -83,24 +92,38 @@ public class RedisCommando {
         return result;
     }
 
-    public RcSet getSetOf(String mapKey) {
-        return new RcSet(this, formatter, mapKey);
+    public Dao getDao(String setKey, String id) {
+        return new DaoSet(this, formatter, setKey).get(id);
+    }
+    
+    public <T extends DaoProxy> T getProxy(String setKey, String id, Class<T> proxyClass) {
+        DaoSet set = new DaoSet(this, formatter, setKey);
+        return new ProxySet<T>(set, proxyClass).get(id);
+    }
+        
+    public DaoSet getSetOf(String setKey) {
+        return new DaoSet(this, formatter, setKey);
+    }
+    
+    public <T extends DaoProxy> ProxySet<T> getSetOf(String setKey, Class<T> proxyClass) {
+        DaoSet set = new DaoSet(this, formatter, setKey);
+        return new ProxySet<T>(set, proxyClass);
     }
 
-    public RedisEval eval() {
-        return new RedisEval(this, this.formatter);
+    public Eval eval() {
+        return new Eval(this, this.formatter);
     }
 
-    public RcCountDownLatch getCdl(String id) {
-        return new RcCountDownLatch(this, formatter, id);
+    public CountDownLatch getCountDownLatch(String id) {
+        return new CountDownLatch(this, formatter, id);
     }
 
-    public RcSubscription subscribe(BiConsumer<String, String> handler) {
-        return new RcSubscription(redis.connectPubSub(), formatter, handler);
+    public Subscription subscribe(BiConsumer<String, String> handler) {
+        return new Subscription(redis.connectPubSub(), formatter, handler);
     }
 
-    public RcSubscription subscribe(String channel, BiConsumer<String, String> handler) {
-        return new RcSubscription(redis.connectPubSub(), formatter, handler, channel);
+    public Subscription subscribe(String channel, BiConsumer<String, String> handler) {
+        return new Subscription(redis.connectPubSub(), formatter, handler, channel);
     }
 
     protected <T> T executeScript(String script, ScriptOutputType outputType, String[] keys, String[] args) {
@@ -113,70 +136,59 @@ public class RedisCommando {
         }
     }
 
-    public void close() {
-        connection.close();
+    @SuppressWarnings("unchecked")
+	protected <T extends DaoProxy> T createObjectProxy(Dao object, Class<T> proxyClass) {
+    	ProxyMetadata metadata = proxyMetadataMap.computeIfAbsent(proxyClass, pc -> proxyMetadataFactory.create(pc));
+    	ProxyInvocationHandler handler = new ProxyInvocationHandler(object, metadata);
+    	return (T) Proxy.newProxyInstance(this.getClass().getClassLoader(), new Class[] {proxyClass}, handler);
     }
 
-    public void registerObjectInsertCallback(String setKey, ObjectInsertCallback handler) {
+    public void registerObjectInsertCallback(String setKey, DaoInsertCallback handler) {
         this.insertCallbackMap.computeIfAbsent(setKey, k -> ConcurrentHashMap.newKeySet()).add(handler);
     }
 
-    public void registerObjectDeleteCallback(String setKey, ObjectDeleteCallback handler) {
+    public void registerObjectDeleteCallback(String setKey, DaoDeleteCallback handler) {
         this.deleteCallbackMap.computeIfAbsent(setKey, k -> ConcurrentHashMap.newKeySet()).add(handler);
     }
 
-    public void registerFieldChangeCallback(String setKey, String fieldName, FieldChangeCallback handler) {
-        Map<String, Set<FieldChangeCallback>> keyUpdateHandlers = changeCallbackMap.computeIfAbsent(setKey, k-> new ConcurrentHashMap<>());
+    public void registerFieldChangeCallback(String setKey, String fieldName, DaoValueChangeCallback handler) {
+        Map<String, Set<DaoValueChangeCallback>> keyUpdateHandlers = changeCallbackMap.computeIfAbsent(setKey, k-> new ConcurrentHashMap<>());
         keyUpdateHandlers.computeIfAbsent(fieldName, k -> ConcurrentHashMap.newKeySet()).add(handler);
     }
 
-    protected void invokeObjectInsertCallbacks(String setKey, String id) {
-        Set<ObjectInsertCallback> insertCallbacks = insertCallbackMap.get(setKey);
+    protected void invokeObjectInsertCallbacks(Dao dao) {
+        Set<DaoInsertCallback> insertCallbacks = insertCallbackMap.get(dao.getSetKey());
         if (insertCallbacks != null) {
-            for (ObjectInsertCallback callback : insertCallbacks) {
-                callback.onInsert(setKey, id);
-            }
-        }
-    }
-    
-    protected void invokeChangeCallbacks(CheckedSetSingleFieldResult result) {
-        Set<ObjectInsertCallback> insertCallbacks = insertCallbackMap.get(result.getSetKey());
-
-        if (insertCallbacks != null && result.getVersion() == 1L) {
-            for (ObjectInsertCallback callback : insertCallbacks) {
-                callback.onInsert(result.getSetKey(), result.getId());
-            }
-        }
-
-        Map<String, Set<FieldChangeCallback>> changeCallbacksForSet = changeCallbackMap.get(result.getSetKey());
-        if (changeCallbacksForSet != null) {
-            Set<FieldChangeCallback> changeCallbacks = changeCallbacksForSet.get(result.getField());
-            if (changeCallbacks != null) {
-            	logger.trace("Invoking {} change callbacks for {}.{}", changeCallbacks.size(), result.getSetKey(), result.getField());
-                for (FieldChangeCallback callback : changeCallbacks) {
-                    callback.onChange(result.getSetKey(), result.getId(), result.getVersion(), result.getField(), result.getBefore(), result.getAfter());
-                }
+            for (DaoInsertCallback callback : insertCallbacks) {
+                callback.onInsert(dao);
             }
         }
     }
 
-    protected void invokeChangeCallbacks(CheckedSetMultiFieldResult result) {
-        Set<ObjectInsertCallback> insertCallbacks = insertCallbackMap.get(result.getSetKey());
-        Map<String, Set<FieldChangeCallback>> changeCallbacksForSet = changeCallbackMap.get(result.getSetKey());
+    protected void invokeChangeCallbacks(SetResult result) {
+        Set<DaoInsertCallback> insertCallbacks = insertCallbackMap.get(result.getDao().getSetKey());
+        Map<String, Set<DaoValueChangeCallback>> changeCallbacksForSet = changeCallbackMap.get(result.getDao().getSetKey());
         
-        if (insertCallbacks != null && result.getVersion() == 1L) {
-            for (ObjectInsertCallback callback : insertCallbacks) {
-                callback.onInsert(result.getSetKey(), result.getId());
+        if (insertCallbacks != null && result.isInsert()) {
+            for (DaoInsertCallback callback : insertCallbacks) {
+                callback.onInsert(result.getDao());
             }
         }
 
         if (changeCallbacksForSet != null) {
-            for (RedisChangedValue change : result.getChanges()) {
-                Set<FieldChangeCallback> changeCallbacks = changeCallbacksForSet.get(change.getField());
-                if (changeCallbacks != null) {
-                    logger.trace("Invoking {} change callbacks for {}.{}", changeCallbacks.size(), result.getSetKey(), change.getField());
-                    for (FieldChangeCallback callback : changeCallbacks) {
-                        callback.onChange(result.getSetKey(), result.getId(), result.getVersion(), change.getField(), change.getBefore(), change.getAfter());
+            for (Change change : result.getChanges()) {
+                Set<DaoValueChangeCallback> changeCallbacksForField = changeCallbacksForSet.get(change.getField());
+                if (changeCallbacksForField != null) {
+                    logger.trace("Invoking {} change callbacks for {}.{}", changeCallbacksForField.size(), result.getDao().getSetKey(), change.getField());
+                    for (DaoValueChangeCallback callback : changeCallbacksForField) {
+                        callback.onChange(result.getDao(), change.getField(), change.getBefore(), change.getAfter());
+                    }
+                }
+                Set<DaoValueChangeCallback> changeCallbacksForStar = changeCallbacksForSet.get("*");
+                if (changeCallbacksForStar != null) {
+                    logger.trace("Invoking {} change callbacks for {}.{}", changeCallbacksForStar.size(), result.getDao().getSetKey(), change.getField());
+                    for (DaoValueChangeCallback callback : changeCallbacksForStar) {
+                        callback.onChange(result.getDao(), change.getField(), change.getBefore(), change.getAfter());
                     }
                 }
             }
@@ -184,11 +196,15 @@ public class RedisCommando {
     }
 
     protected void invokeDeleteCallbacks(String setKey, String id) {
-        Set<ObjectDeleteCallback> deleteCallbacks = deleteCallbackMap.get(setKey);
+        Set<DaoDeleteCallback> deleteCallbacks = deleteCallbackMap.get(setKey);
         if (deleteCallbacks != null) {
-            for (ObjectDeleteCallback callback : deleteCallbacks) {
+            for (DaoDeleteCallback callback : deleteCallbacks) {
                 callback.onDelete(setKey, id);
             }
         }
+    }
+
+    public void close() {
+        connection.close();
     }
 } 

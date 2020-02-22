@@ -1,12 +1,12 @@
 package com.jarcadia.rcommando;
 
-public class RedisChangedValue {
+public class Change {
 
     private final String field;
-    private final RcValue before;
-    private final RcValue after;
+    private final DaoValue before;
+    private final DaoValue after;
 
-    protected RedisChangedValue(String field, RcValue before, RcValue after) {
+    protected Change(String field, DaoValue before, DaoValue after) {
         this.field = field;
         this.before = before;
         this.after = after;
@@ -16,11 +16,11 @@ public class RedisChangedValue {
         return field;
     }
 
-    public RcValue getBefore() {
+    public DaoValue getBefore() {
         return before;
     }
 
-    public RcValue getAfter() {
+    public DaoValue getAfter() {
         return after;
     }
 }

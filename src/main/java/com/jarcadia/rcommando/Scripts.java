@@ -3,7 +3,7 @@ package com.jarcadia.rcommando;
 
 class Scripts {
 	
-	protected static String OBJ_CHECKED_TOUCH = """
+	protected static String OBJ_TOUCH = """
         --Keys setKey, objKey, changeChannelKey
         local v = redis.call('hincrby', KEYS[2], 'v', 1);
         if (v == 1) then
@@ -19,16 +19,18 @@ class Scripts {
 		--Args id
 		local removed = redis.call('del', KEYS[2]);
 		if (removed == 1) then 
-			redis.call('srem', KEYS[1], ARGV[1]);
-			redis.call('publish', KEYS[3], '{"' .. ARGV[1] .. '":null}')
+            local id = string.sub(KEYS[2], string.len(KEYS[1]) + 2);
+			redis.call('srem', KEYS[1], id);
+			redis.call('publish', KEYS[3], '{"' .. id .. '":null}')
 		end
 		return removed;
     """;
     
-    protected static String OBJ_CHECKED_SET = """
+    protected static String OBJ_SET = """
         --Keys setKey, hashKey, changeChannelKey
         --Args field value [field value...] 
         local changed = false;
+        local publish = false;
         local update = {};
         local changes = {};
         for i=1,#ARGV,2 do
@@ -39,23 +41,35 @@ class Scripts {
                 table.insert(changes, ARGV[i]);
                 table.insert(changes, prev);
                 table.insert(changes, ARGV[i+1]);
-                update[ARGV[i]] = cjson.decode(ARGV[i+1])
+                if (string.sub(ARGV[i], 1, 1) ~= '_') then
+                    update[ARGV[i]] = cjson.decode(ARGV[i+1])
+                	publish = true;
+                end
             end
         end
+
         if (changed) then
+    		-- Extract ID from keys
             local id = string.sub(KEYS[2], string.len(KEYS[1]) + 2);
+            -- Bump version 
             local ver = redis.call('hincrby', KEYS[2], 'v', 1);
-            update['v'] = ver;
+            -- Add version as first element in response
             table.insert(changes, 1, tostring(ver));
             if (ver == 1) then
+                -- If this is version 1, add to set
                 redis.call('sadd', KEYS[1], id);
+                -- Always publish on insert (even if only internal fields were changed - they won't be in the update)
+                publish = true;
             end
-            redis.call('publish', KEYS[3], '{"' .. id .. '":' .. cjson.encode(update) .. '}');
+            if (publish) then
+                update['v'] = ver;
+                redis.call('publish', KEYS[3], '{"' .. id .. '":' .. cjson.encode(update) .. '}');
+            end
         end
         return changes
     """;
     
-    protected static String OBJ_CHECKED_DEL_FIELD = """
+    protected static String OBJ_CLEAR_FIELD = """
     	--Keys setKey, hashKey, changeChannelKey
         --Args [fields ...]
         local changed = false;

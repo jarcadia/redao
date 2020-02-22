@@ -12,13 +12,13 @@ import java.util.stream.StreamSupport;
 import io.lettuce.core.StreamScanCursor;
 import io.lettuce.core.output.ValueStreamingChannel;
 
-public class RcSet implements Iterable<RcObject> {
+public class DaoSet implements Iterable<Dao> {
 
     private final RedisCommando rcommando;
-    private final RedisValueFormatter formatter;
+    private final ValueFormatter formatter;
     private final String setKey;
 
-    protected RcSet(RedisCommando rcommando, RedisValueFormatter formatter, String setKey) {
+    protected DaoSet(RedisCommando rcommando, ValueFormatter formatter, String setKey) {
         this.rcommando = rcommando;
         this.formatter = formatter;
         this.setKey = setKey;
@@ -35,26 +35,31 @@ public class RcSet implements Iterable<RcObject> {
     public boolean has(String id) {
         return rcommando.core().sismember(setKey, id);
     }
+    
+    public Dao get(String id) {
+        return new Dao(rcommando, formatter, setKey, id);
+    }
+    
+    public Dao randomMember() {
+    	String id = rcommando.core().srandmember(setKey);
+    	return id == null ? null : get(id);
+    }
 
     @Override
-    public Iterator<RcObject> iterator() {
+    public Iterator<Dao> iterator() {
         return new RedisObjectStreamer();
     }
     
-    public Stream<RcObject> stream() {
+    public Stream<Dao> stream() {
         return StreamSupport.stream(this.spliterator(), false);
     }
-
-    public RcObject get(String id) {
-        return new RcObject(rcommando, formatter, setKey, id);
-    }
     
-    public Set<RcObject> getSubset(Collection<String> ids) {
+    public Set<Dao> getSubset(Collection<String> ids) {
     	return ids.stream().map(id -> this.get(id))
     			.collect(Collectors.toSet());
     }
     
-    private class RedisObjectStreamer implements Iterator<RcObject> {
+    private class RedisObjectStreamer implements Iterator<Dao> {
 
         private final List<String> buffer;
         private final ValueStreamingChannel<String> channel;
@@ -68,16 +73,19 @@ public class RcSet implements Iterable<RcObject> {
 
         @Override
         public boolean hasNext() {
-            return !buffer.isEmpty() || !cursor.isFinished();
+        	if (!buffer.isEmpty()) {
+        		return true;
+        	} else if (cursor.isFinished()) {
+        		return false;
+        	} else {
+                cursor = rcommando.core().sscan(channel, setKey, cursor);
+                return this.hasNext();
+        	}
         }
 
         @Override
-        public RcObject next() {
-            if (buffer.isEmpty()) {
-                cursor = rcommando.core().sscan(channel, setKey, cursor);
-            }
+        public Dao next() {
             return get(buffer.remove(0));
         }
-        
     }
 }

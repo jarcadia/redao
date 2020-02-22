@@ -1,4 +1,4 @@
-package com.jarcadia.rcommando;
+package com.jarcadia.rcommando.exception;
 
 public class RcDeserializationException extends Exception {
 

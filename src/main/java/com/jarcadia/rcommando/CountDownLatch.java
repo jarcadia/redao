@@ -7,13 +7,13 @@ import java.util.Optional;
 
 import io.lettuce.core.KeyValue;
 
-public class RcCountDownLatch {
+public class CountDownLatch {
     
     private final RedisCommando rcommando;
-    private final RedisValueFormatter formatter;
+    private final ValueFormatter formatter;
     private final String hashKey;
     
-    public RcCountDownLatch(RedisCommando rcommando, RedisValueFormatter formatter, String id) {
+    protected CountDownLatch(RedisCommando rcommando, ValueFormatter formatter, String id) {
         this.rcommando = rcommando;
         this.formatter = formatter;
         this.hashKey =  "cdl." + id;
@@ -35,22 +35,22 @@ public class RcCountDownLatch {
         }
     }
 
-    public Optional<RcValue> decrement(String field) {
+    public Optional<DaoValue> decrement(String field) {
         long remaining = rcommando.core().hincrby(this.hashKey, "remaining", -1);
         if (remaining == 0) {
-            RcValue value = new RcValue(formatter, rcommando.core().hget(hashKey, field));
+            DaoValue value = new DaoValue(formatter, rcommando.core().hget(hashKey, field));
             rcommando.core().del(this.hashKey);
             return Optional.of(value);
         }
         return Optional.empty();
     }
 
-    public Optional<RcValues> decrement(String... fields) {
+    public Optional<DaoValues> decrement(String... fields) {
         long remaining = rcommando.core().hincrby(this.hashKey, "remaining", -1);
         if (remaining == 0) {
             List<KeyValue<String, String>> values = rcommando.core().hmget(this.hashKey, fields);
             rcommando.core().del(this.hashKey);
-            return Optional.of(new RcValues(formatter, values.iterator()));
+            return Optional.of(new DaoValues(formatter, values.iterator()));
         }
         return Optional.empty();
     }

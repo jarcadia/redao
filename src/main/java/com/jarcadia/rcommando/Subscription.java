@@ -11,25 +11,27 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.jarcadia.rcommando.exception.RedisCommandoException;
+
 import io.lettuce.core.pubsub.RedisPubSubListener;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.pubsub.api.async.RedisPubSubAsyncCommands;
 
-public class RcSubscription implements Closeable {
+public class Subscription implements Closeable {
 	
-    private final Logger logger = LoggerFactory.getLogger(RcSubscription.class);
+    private final Logger logger = LoggerFactory.getLogger(Subscription.class);
     
     private final StatefulRedisPubSubConnection<String, String> pubsubConnection;
     private final Listener listener;
     
-    protected RcSubscription(StatefulRedisPubSubConnection<String, String> pubsubConnection, RedisValueFormatter formatter, BiConsumer<String, String> consumer) {
+    protected Subscription(StatefulRedisPubSubConnection<String, String> pubsubConnection, ValueFormatter formatter, BiConsumer<String, String> consumer) {
         this.pubsubConnection = pubsubConnection;
         RedisPubSubAsyncCommands<String, String> async = pubsubConnection.async();
         this.listener = new Listener(async, consumer);
         this.pubsubConnection.addListener(listener);
     }
 
-    protected RcSubscription(StatefulRedisPubSubConnection<String, String> pubsubConnection, RedisValueFormatter formatter, BiConsumer<String, String> consumer, String channel) {
+    protected Subscription(StatefulRedisPubSubConnection<String, String> pubsubConnection, ValueFormatter formatter, BiConsumer<String, String> consumer, String channel) {
     	this(pubsubConnection, formatter, consumer);
     	this.subscribe(channel);
     }
@@ -71,7 +73,7 @@ public class RcSubscription implements Closeable {
             try {
 				this.async.subscribe(channel).get();
 			} catch (InterruptedException | ExecutionException e) {
-				throw new RcException("Unable to subscribe to " + channel);
+				throw new RedisCommandoException("Unable to subscribe to " + channel);
 			}
     	}
     	
@@ -85,7 +87,7 @@ public class RcSubscription implements Closeable {
     		try {
 				future.get();
 			} catch (InterruptedException | ExecutionException e) {
-				throw new RcException("Unable to unsubscribe from " + channel);
+				throw new RedisCommandoException("Unable to unsubscribe from " + channel);
 			}
     	}
     	

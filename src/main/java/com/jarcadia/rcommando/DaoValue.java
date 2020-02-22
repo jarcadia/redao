@@ -13,13 +13,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.CollectionType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.jarcadia.rcommando.exception.RcDeserializationException;
+import com.jarcadia.rcommando.exception.RedisCommandoException;
 
-public class RcValue {
+public class DaoValue {
     
-    private final RedisValueFormatter formatter;
+    private final ValueFormatter formatter;
     private final String value;
     
-    protected RcValue(RedisValueFormatter formatter, String value) {
+    protected DaoValue(ValueFormatter formatter, String value) {
         this.formatter = formatter;
         this.value = value;
     }
@@ -32,7 +34,7 @@ public class RcValue {
         try {
 			return formatter.deserialize(value, String.class);
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as String");
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as String");
 		}
     }
 
@@ -40,7 +42,7 @@ public class RcValue {
         try {
 			return formatter.deserialize(value, Integer.class);
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as Integer");
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as Integer");
 		}
     }
 
@@ -48,7 +50,7 @@ public class RcValue {
         try {
 			return formatter.deserialize(value, Long.class);
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as Long");
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as Long");
 		}
     }
     
@@ -56,7 +58,7 @@ public class RcValue {
         try {
 			return formatter.deserialize(value, Double.class);
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as Double");
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as Double");
 		}
     }
     
@@ -64,7 +66,7 @@ public class RcValue {
         try {
 			return formatter.deserialize(value, clazz);
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as "+ clazz.getSimpleName());
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as "+ clazz.getSimpleName());
 		}
     }
     
@@ -72,16 +74,24 @@ public class RcValue {
         try {
 			return formatter.deserialize(value, type);
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as "+ type.getTypeName());
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as "+ type.getTypeName());
 		}
     }
     
-    
     public <T> Optional<T> asOptionalOf(Class<T> clazz) {
     	try {
-			return value == null ? Optional.empty() : Optional.of(formatter.deserialize(value, clazz));
+    		if (value == null) {
+    			return null;
+    		} else {
+    			T v = formatter.deserialize(value, clazz);
+    			if ( v == null) {
+    				throw new RedisCommandoException("Deserializing " + value + " as " + clazz.getName() + " resulted in null");
+    			} else {
+    				return Optional.of(v);
+    			}
+    		}
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as Optional<"+ clazz.getSimpleName()+">");
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as Optional<"+ clazz.getSimpleName()+">");
 		}
     }
     
@@ -90,7 +100,7 @@ public class RcValue {
         try {
 			return formatter.deserialize(value, typeReference);
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as List<"+ clazz.getSimpleName()+">");
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as List<"+ clazz.getSimpleName()+">");
 		}
     }
     
@@ -99,19 +109,19 @@ public class RcValue {
         try {
 			return formatter.deserialize(value, typeReference);
 		} catch (RcDeserializationException e) {
-			throw new RcException("Unable to deserialize " + this.getRawValue() + " as Set<"+ clazz.getSimpleName()+">");
+			throw new RedisCommandoException("Unable to deserialize " + this.getRawValue() + " as Set<"+ clazz.getSimpleName()+">");
 		}
     }
     
-    public Map<String, RcValue> asMap() {
+    public Map<String, DaoValue> asMap() {
         ObjectNode obj = (ObjectNode) formatter.asNode(value);
-        Map<String, RcValue> result = new HashMap<>();
+        Map<String, DaoValue> result = new HashMap<>();
         
         for (Iterator<Entry<String, JsonNode>> iter = obj.fields(); iter.hasNext(); ) {
             Entry<String, JsonNode> entry = iter.next();
             String fieldName = entry.getKey();
             String rawValue = formatter.serialize(entry.getValue());
-            result.put(fieldName, new RcValue(formatter, rawValue));
+            result.put(fieldName, new DaoValue(formatter, rawValue));
         }
         
         return result;

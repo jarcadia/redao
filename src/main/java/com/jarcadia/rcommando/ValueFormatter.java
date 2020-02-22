@@ -7,12 +7,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jarcadia.rcommando.exception.RcDeserializationException;
+import com.jarcadia.rcommando.exception.RedisCommandoException;
 
-class RedisValueFormatter {
+class ValueFormatter {
 
     private final ObjectMapper mapper;
 
-    public RedisValueFormatter(ObjectMapper mapper) {
+    public ValueFormatter(ObjectMapper mapper) {
         this.mapper = mapper;
     }
 
@@ -48,7 +50,7 @@ class RedisValueFormatter {
             return mapper.readTree(json);
         }
         catch (IOException e) {
-            throw new RcException("Unable to parse JSON", e);
+            throw new RedisCommandoException("Unable to parse JSON", e);
         }
     }
     
@@ -57,7 +59,7 @@ class RedisValueFormatter {
             return mapper.writeValueAsString(obj);
         }
         catch (JsonProcessingException e) {
-            throw new RcException("Unable to serialize to JSON", e);
+            throw new RedisCommandoException("Unable to serialize to JSON", e);
         }
     }
 }
