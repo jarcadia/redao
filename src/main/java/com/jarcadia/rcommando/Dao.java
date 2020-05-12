@@ -1,6 +1,7 @@
 package com.jarcadia.rcommando;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -141,24 +142,29 @@ public class Dao {
     }
     
     private String[] prepareArgsAsArray(Object[] fieldsAndValues) {
-        String[] args = new String[fieldsAndValues.length];
-        if (args.length % 2 != 0) {
+        if (fieldsAndValues.length % 2 != 0) {
             throw new IllegalArgumentException("A value must be specified for each field name");
         }
-        for (int i=0; i<args.length; i++) {
-            if (i % 2 == 0) {
-                // Process field
+        String[] args = new String[fieldsAndValues.length];
+        int argsIdx = 0;
+        int nullCount = 0;
+        for (int i=0; i<fieldsAndValues.length; i+=2) {
+        	if (fieldsAndValues[i+1] == null) {
+        		nullCount++;
+        	} else {
                 if (fieldsAndValues[i] instanceof String) {
-                    args[i] = (String) fieldsAndValues[i];
+                    args[argsIdx++] = (String) fieldsAndValues[i];
+                    args[argsIdx++] = formatter.serialize(fieldsAndValues[i+1]);
                 } else {
                     throw new IllegalArgumentException("Field name is set operation must be a String");
                 }
-            } else {
-                // Process value
-                args[i] = formatter.serialize(fieldsAndValues[i]);
-            }
+        	}
         }
-        return args;
+        if (nullCount > 0) {
+        	return Arrays.copyOf(args, args.length - nullCount * 2);
+        } else {
+            return args;
+        }
     }
     
     @Override
