@@ -26,7 +26,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jarcadia.rcommando.ProxyMetadata.Getter;
 import com.jarcadia.rcommando.exception.ProxyException;
-import com.jarcadia.rcommando.proxy.DaoProxy;
+import com.jarcadia.rcommando.proxy.Proxy;
 import com.jarcadia.rcommando.proxy.Internal;
 
 public class ProxyMetadataFactory {
@@ -39,7 +39,7 @@ public class ProxyMetadataFactory {
 		this.objectMapper = objectMapper;
 	}
 	
-	protected ProxyMetadata create(Class<? extends DaoProxy> proxyClass) {
+	protected ProxyMetadata create(Class<? extends Proxy> proxyClass) {
 		Method lookupGenerator = null;
 		Method daoGetter = null;
 
@@ -153,7 +153,7 @@ public class ProxyMetadataFactory {
             Type rawType = parameterizedType.getRawType();
             Type[] typeArgs = parameterizedType.getActualTypeArguments();
             return typeArgs.length == 1 && verifyTypeIsClass(rawType, Optional.class) &&
-            		verifyTypeIsClass(typeArgs[0], SetResult.class);
+            		verifyTypeIsClass(typeArgs[0], Modification.class);
 		} else {
 			return false;
 		}
@@ -202,7 +202,7 @@ public class ProxyMetadataFactory {
 		return isInternal(method) || param.getAnnotation(Internal.class) != null;
 	}
 	
-	private MethodHandles.Lookup generateLookup(Class<? extends DaoProxy> proxyClass, Method lookupGenerator) {
+	private MethodHandles.Lookup generateLookup(Class<? extends Proxy> proxyClass, Method lookupGenerator) {
 		if (lookupGenerator != null) {
 			try {
 				return (Lookup) lookupGenerator.invoke(null);

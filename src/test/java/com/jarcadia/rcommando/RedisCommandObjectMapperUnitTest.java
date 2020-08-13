@@ -10,7 +10,6 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -20,24 +19,24 @@ public class RedisCommandObjectMapperUnitTest {
 	RedisCommando rcommando;
 	
 	@Mock
-	DaoSet daoSet;
+    Index index;
 	
 	@Mock
 	Dao dao;
 	
 	@BeforeEach
 	public void setupRcommando() {
-    	Mockito.when(rcommando.getSetOf("objs")).thenReturn(daoSet);
+    	Mockito.when(rcommando.getSetOf("objs")).thenReturn(index);
 	}
 
 	@BeforeEach
 	public void setupDaoSet() {
-    	Mockito.when(daoSet.get("abc123")).thenReturn(dao);
+    	Mockito.when(index.get("abc123")).thenReturn(dao);
 	}
 
 	@BeforeEach
 	public void setupDao() {
-    	Mockito.when(dao.getSetKey()).thenReturn("objs");
+    	Mockito.when(dao.getType()).thenReturn("objs");
     	Mockito.when(dao.getId()).thenReturn("abc123");
 	}
 
@@ -47,7 +46,7 @@ public class RedisCommandObjectMapperUnitTest {
     	String serialized = mapper.writeValueAsString(dao);
     	Assertions.assertEquals(quoted("objs:abc123"), serialized);
     	Dao dao = mapper.readValue(serialized, Dao.class);
-    	Assertions.assertEquals("objs", dao.getSetKey());
+    	Assertions.assertEquals("objs", dao.getType());
     	Assertions.assertEquals("abc123", dao.getId());
     }
     

@@ -1,12 +1,12 @@
 package com.jarcadia.rcommando;
 
-public class Change {
+public class ModifiedValue {
 
     private final String field;
     private final DaoValue before;
     private final DaoValue after;
 
-    protected Change(String field, DaoValue before, DaoValue after) {
+    protected ModifiedValue(String field, DaoValue before, DaoValue after) {
         this.field = field;
         this.before = before;
         this.after = after;

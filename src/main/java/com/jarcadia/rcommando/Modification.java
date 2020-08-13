@@ -2,15 +2,15 @@ package com.jarcadia.rcommando;
 
 import java.util.List;
 
-public class SetResult {
+public class Modification {
 	
-	public static final SetResult UNCHANGED = null;
+	public static final Modification UNCHANGED = null;
 	
 	private final Dao dao;
-    private final List<Change> changes;
+    private final List<ModifiedValue> changes;
     private final boolean inserted;
 
-    protected SetResult(Dao dao, boolean inserted, List<Change> changes) {
+    protected Modification(Dao dao, boolean inserted, List<ModifiedValue> changes) {
     	this.dao = dao;
         this.changes = changes;
         this.inserted = inserted;
@@ -24,7 +24,7 @@ public class SetResult {
         return inserted;
     }
 
-    public List<Change> getChanges() {
+    public List<ModifiedValue> getChanges() {
         return changes;
     }
 }

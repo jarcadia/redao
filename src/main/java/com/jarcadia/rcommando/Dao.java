@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.jarcadia.rcommando.proxy.DaoProxy;
+import com.jarcadia.rcommando.proxy.Proxy;
 
 import io.lettuce.core.KeyValue;
 
@@ -17,20 +17,20 @@ public class Dao {
     
     private final RedisCommando rcommando;
     private final ValueFormatter formatter;
-    private final String setKey;
-    private final String hashKey;
+    private final String type;
+    private final String path;
     private final String id;
 
-    protected Dao(RedisCommando rcommando, ValueFormatter formatter, String setKey, String id) {
+    protected Dao(RedisCommando rcommando, ValueFormatter formatter, String type, String id) {
         this.rcommando = rcommando;
         this.formatter = formatter;
-        this.setKey = setKey;
-        this.hashKey = setKey + ":" + id;
+        this.type = type;
+        this.path = type + "/" + id;
         this.id = id;
     }
 
-    public String getSetKey() {
-        return setKey;
+    public String getType() {
+        return type;
     }
 
     public String getId() {
@@ -38,44 +38,44 @@ public class Dao {
     }
     
     public boolean exists() {
-    	return rcommando.core().exists(this.hashKey) == 1L;
+    	return rcommando.core().exists(this.path) == 1L;
     }
 
-    public <T extends DaoProxy> T as(Class<T> proxyClass) {
+    public <T extends Proxy> T as(Class<T> proxyClass) {
     	return rcommando.createObjectProxy(this, proxyClass);
     }
 
     public DaoValue get(String field) {
-        return new DaoValue(formatter, rcommando.core().hget(hashKey, field));
+        return new DaoValue(formatter, rcommando.core().hget(path, field));
     }
 
     public DaoValues get(String... fields) {
-        List<KeyValue<String, String>> values = rcommando.core().hmget(this.hashKey, fields);
+        List<KeyValue<String, String>> values = rcommando.core().hmget(this.path, fields);
         return  new DaoValues(formatter, values.iterator());
     }
 
-    public Optional<SetResult> set(Object... fieldsAndValues) {
+    public Optional<Modification> set(Object... fieldsAndValues) {
         return this.set(0, fieldsAndValues);
    }
 
-    public Optional<SetResult> set(long score, Object... fieldsAndValues) {
+    public Optional<Modification> set(long score, Object... fieldsAndValues) {
     	List<String> bulkChanges = rcommando.eval()
                 .cachedScript(Scripts.OBJ_SET)
-                .addKeys(this.setKey, this.hashKey, this.setKey+".change")
+                .addKeys(this.type, this.path, this.type +".change")
                 .addArg(score)
                 .addArgs(prepareArgsAsArray(fieldsAndValues))
                 .returnMulti();
 
         if (bulkChanges.size() > 0) {
-            List<Change> changes = new ArrayList<>();
+            List<ModifiedValue> changes = new ArrayList<>();
             long version = Long.parseLong(bulkChanges.get(0));
             for (int i=1; i<bulkChanges.size(); i+=3) {
-                Change changedValue = new Change(bulkChanges.get(i),
+                ModifiedValue changedValue = new ModifiedValue(bulkChanges.get(i),
                         new DaoValue(formatter, bulkChanges.get(i+1)),
                         new DaoValue(formatter, bulkChanges.get(i+2)));
                 changes.add(changedValue);
             }
-            SetResult result = new SetResult(this, version == 1L, changes);
+            Modification result = new Modification(this, version == 1L, changes);
             rcommando.invokeChangeCallbacks(result);
             return Optional.of(result);
         } else {
@@ -83,7 +83,7 @@ public class Dao {
         }
     }
 
-    public Optional<SetResult> set(Map<String, Object> properties) {
+    public Optional<Modification> set(Map<String, Object> properties) {
         if (properties.isEmpty()) {
             return Optional.empty();
         } else {
@@ -98,7 +98,7 @@ public class Dao {
     public boolean touch() {
         boolean created = rcommando.eval()
             .cachedScript(Scripts.OBJ_TOUCH)
-            .addKeys(this.setKey, this.hashKey, this.setKey + ".change")
+            .addKeys(this.type, this.path, this.type + ".change")
             .addArg(0)
             .returnLong() == 1L;
         if (created) {
@@ -110,34 +110,34 @@ public class Dao {
     public boolean delete() {
         int numDeleted = rcommando.eval()
                 .cachedScript(Scripts.OBJ_CHECKED_DELETE)
-                .addKeys(this.setKey, this.hashKey, this.setKey + ".change")
+                .addKeys(this.type, this.path, this.type + ".change")
                 .returnInt();
         
         if (numDeleted == 1) {
-            rcommando.invokeDeleteCallbacks(setKey, id);
+            rcommando.invokeDeleteCallbacks(type, id);
             return true;
         } else {
             return false;
         }
     }
 
-    public Optional<SetResult> clear(String... fields) {
+    public Optional<Modification> clear(String... fields) {
         List<String> bulkChanges = rcommando.eval()
                 .cachedScript(Scripts.OBJ_CLEAR_FIELD)
-                .addKeys(this.setKey, this.hashKey, this.setKey+".change")
+                .addKeys(this.type, this.path, this.type +".change")
                 .addArgs(fields)
                 .returnMulti();
 
         if (bulkChanges.size() > 0) {
-            List<Change> changes = new ArrayList<>();
+            List<ModifiedValue> changes = new ArrayList<>();
             long version = Long.parseLong(bulkChanges.get(0));
             for (int i=1; i<bulkChanges.size(); i+=2) {
-                Change changedValue = new Change(bulkChanges.get(i),
+                ModifiedValue changedValue = new ModifiedValue(bulkChanges.get(i),
                         new DaoValue(formatter, bulkChanges.get(i+1)),
                         new DaoValue(formatter, null));
                 changes.add(changedValue);
             }
-            SetResult result = new SetResult(this, false, changes);
+            Modification result = new Modification(this, false, changes);
             rcommando.invokeChangeCallbacks(result);
             return Optional.of(result);
         } else {
@@ -173,7 +173,7 @@ public class Dao {
     
     @Override
     public int hashCode() {
-    	return Objects.hash(setKey, id);
+    	return Objects.hash(type, id);
     }
 
     @Override
@@ -183,6 +183,6 @@ public class Dao {
     
     @Override
     public String toString() {
-    	return this.hashKey;
+    	return this.path;
     }
 }

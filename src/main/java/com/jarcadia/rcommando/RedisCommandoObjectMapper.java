@@ -19,7 +19,7 @@ import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
-import com.jarcadia.rcommando.proxy.DaoProxy;
+import com.jarcadia.rcommando.proxy.Proxy;
 
 public class RedisCommandoObjectMapper extends ObjectMapper {
 	
@@ -27,7 +27,7 @@ public class RedisCommandoObjectMapper extends ObjectMapper {
 		this.registerModules(rcProxyModule(), optionalModule(), rcObjectModule(rcommando), rcMapModule(rcommando));
 	}
 	
-	public <T extends DaoProxy> void registerProxyClass(Class<T> proxyClass) {
+	public <T extends Proxy> void registerProxyClass(Class<T> proxyClass) {
 		SimpleModule module = new SimpleModule();
 		JsonDeserializer<T> deserializer = new StdDeserializer<T>(proxyClass) {
 			@Override
@@ -57,7 +57,7 @@ public class RedisCommandoObjectMapper extends ObjectMapper {
 	private SimpleModule rcMapModule(RedisCommando rcommando) {
 		SimpleModule module = new SimpleModule();
 		module.addSerializer(new DaoSetSerializer());
-		module.addDeserializer(DaoSet.class, new DaoSetDeserializer(rcommando));
+		module.addDeserializer(Index.class, new DaoSetDeserializer(rcommando));
 		return module;
 	}
 	
@@ -67,14 +67,14 @@ public class RedisCommandoObjectMapper extends ObjectMapper {
 		return module;
 	}
 	
-	private class DaoProxySerializer extends StdSerializer<DaoProxy> {
+	private class DaoProxySerializer extends StdSerializer<Proxy> {
 		
 		 public DaoProxySerializer() {
-            super(DaoProxy.class);
+            super(Proxy.class);
         }
      
         @Override
-        public void serialize(DaoProxy value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+        public void serialize(Proxy value, JsonGenerator gen, SerializerProvider provider) throws IOException {
         	gen.writeString(value.getSetKey() + ":" + value.getId());
         }
 	}
@@ -88,7 +88,7 @@ public class RedisCommandoObjectMapper extends ObjectMapper {
 	 
 		@Override
 		public void serialize(Dao value, JsonGenerator gen, SerializerProvider provider) throws IOException {
-			gen.writeString(value.getSetKey() + ":" + value.getId());
+			gen.writeString(value.getType() + ":" + value.getId());
 		}
 	}
 
@@ -121,29 +121,29 @@ public class RedisCommandoObjectMapper extends ObjectMapper {
 	    }
 	}
 	
-	private class DaoSetSerializer extends StdSerializer<DaoSet> {
+	private class DaoSetSerializer extends StdSerializer<Index> {
 		
 	    public DaoSetSerializer() {
-	        super(DaoSet.class);
+	        super(Index.class);
 	    }
 	 
 		@Override
-		public void serialize(DaoSet value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+		public void serialize(Index value, JsonGenerator gen, SerializerProvider provider) throws IOException {
             gen.writeString(value.getKey());
 		}
 	}
 	
-	private class DaoSetDeserializer extends StdDeserializer<DaoSet> {
+	private class DaoSetDeserializer extends StdDeserializer<Index> {
 		
 		private RedisCommando rcommando;
 		
 		public DaoSetDeserializer(RedisCommando rcommando) {
-			super(DaoSet.class);
+			super(Index.class);
 			this.rcommando = rcommando;
 	    }
 	 
 	    @Override
-	    public DaoSet deserialize(JsonParser parser, DeserializationContext deserializer) throws IOException {
+	    public Index deserialize(JsonParser parser, DeserializationContext deserializer) throws IOException {
 	    	JsonNode node = parser.readValueAsTree();
 	    	if (node.isTextual()) {
 	    		return rcommando.getSetOf(node.asText());

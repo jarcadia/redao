@@ -12,15 +12,14 @@ import java.util.stream.StreamSupport;
 import io.lettuce.core.ScoredValue;
 import io.lettuce.core.StreamScanCursor;
 import io.lettuce.core.output.ScoredValueStreamingChannel;
-import io.lettuce.core.output.ValueStreamingChannel;
 
-public class DaoSet implements Iterable<Dao> {
+public class Index implements Iterable<Dao> {
 
     private final RedisCommando rcommando;
     private final ValueFormatter formatter;
     private final String setKey;
 
-    protected DaoSet(RedisCommando rcommando, ValueFormatter formatter, String setKey) {
+    protected Index(RedisCommando rcommando, ValueFormatter formatter, String setKey) {
         this.rcommando = rcommando;
         this.formatter = formatter;
         this.setKey = setKey;
@@ -30,7 +29,7 @@ public class DaoSet implements Iterable<Dao> {
     	return this.getKey();
     }
 
-    public long size() {
+    public long count() {
         return rcommando.core().zcard(setKey);
     }
 
@@ -41,34 +40,29 @@ public class DaoSet implements Iterable<Dao> {
     public Dao get(String id) {
         return new Dao(rcommando, formatter, setKey, id);
     }
-    
-    public Dao randomMember() {
-        // TODO make this random
-    	List<String> range = rcommando.core().zrange(setKey, 0, 1);
-    	return range.size() == 0 ? null : get(range.get(0));
+
+    public Set<Dao> get(Collection<String> ids) {
+        // TODO this could be improved to be one (or a few) round trips using LUA
+        return ids.stream().map(id -> this.get(id))
+                .collect(Collectors.toSet());
     }
 
     @Override
     public Iterator<Dao> iterator() {
-        return new DaoIterator();
+        return new IndexIterator();
     }
     
     public Stream<Dao> stream() {
         return StreamSupport.stream(this.spliterator(), false);
     }
     
-    public Set<Dao> getSubset(Collection<String> ids) {
-    	return ids.stream().map(id -> this.get(id))
-    			.collect(Collectors.toSet());
-    }
-    
-    private class DaoIterator implements Iterator<Dao> {
+    private class IndexIterator implements Iterator<Dao> {
 
         private final List<ScoredValue<String>> buffer;
         private final ScoredValueStreamingChannel<String> channel;
         private StreamScanCursor cursor;
         
-        public DaoIterator() {
+        public IndexIterator() {
             this.buffer = new LinkedList<>();
             this.channel = value -> buffer.add(value);
             this.cursor = rcommando.core().zscan(channel, setKey);

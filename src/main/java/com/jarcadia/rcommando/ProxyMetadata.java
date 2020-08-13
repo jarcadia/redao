@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.jarcadia.rcommando.exception.RedisCommandoException;
-import com.jarcadia.rcommando.proxy.DaoProxy;
+import com.jarcadia.rcommando.proxy.Proxy;
 
 class ProxyMetadata {
 	
@@ -18,7 +18,7 @@ class ProxyMetadata {
 		DEFAULT, GETTER, SETTER, CLEARER, PASSTHROUGH, IMPLEMENTED;
 	}
 	
-	private final Class<? extends DaoProxy> proxyClass;
+	private final Class<? extends Proxy> proxyClass;
 	private final Method daoGetter;
 	private final Map<Method, Type> typeMap;
 	private final List<Getter> getters;
@@ -29,7 +29,7 @@ class ProxyMetadata {
 	private final Map<Method, Method> passthroughMethodsMap;
 	private final MethodHandles.Lookup lookup;
 
-	public ProxyMetadata(Class<? extends DaoProxy> proxyClass, Method daoGetter, Set<Method> defaultMethods,
+	public ProxyMetadata(Class<? extends Proxy> proxyClass, Method daoGetter, Set<Method> defaultMethods,
 			List<Getter> getters, Map<Method, String[]> setters, Map<Method, String[]> clearers,
 			Map<Method, Method> passthroughMethodsMap, MethodHandles.Lookup lookup) {
 		this.proxyClass = proxyClass;
@@ -66,7 +66,7 @@ class ProxyMetadata {
 		}
 	}
 	
-	protected Class<? extends DaoProxy> getProxyClass() {
+	protected Class<? extends Proxy> getProxyClass() {
 		return proxyClass;
 	}
 

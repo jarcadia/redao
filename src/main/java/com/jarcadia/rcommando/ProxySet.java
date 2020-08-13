@@ -7,14 +7,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import com.jarcadia.rcommando.proxy.DaoProxy;
+import com.jarcadia.rcommando.proxy.Proxy;
 
-public class ProxySet<T extends DaoProxy> implements Iterable<T> {
+public class ProxySet<T extends Proxy> implements Iterable<T> {
 
-    private final DaoSet set;
+    private final Index set;
     private final Class<T> proxyClass;
 
-    protected ProxySet(DaoSet set, Class<T> proxyClass) {
+    protected ProxySet(Index set, Class<T> proxyClass) {
     	this.set = set;
     	this.proxyClass = proxyClass;
     }
@@ -24,7 +24,7 @@ public class ProxySet<T extends DaoProxy> implements Iterable<T> {
     }
 
     public long size() {
-    	return set.size();
+    	return set.count();
     }
 
     public boolean has(String id) {
@@ -35,11 +35,6 @@ public class ProxySet<T extends DaoProxy> implements Iterable<T> {
         return set.get(id).as(proxyClass);
     }
     
-    public T randomMember() {
-    	Dao dao = set.randomMember();
-    	return dao == null ? null : dao.as(proxyClass);
-    }
-
     @Override
     public Iterator<T> iterator() {
         return new ProxiedObjectIterator(set.iterator());

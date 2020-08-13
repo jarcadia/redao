@@ -15,7 +15,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.jarcadia.rcommando.proxy.DaoProxy;
+import com.jarcadia.rcommando.proxy.Proxy;
 import com.jarcadia.rcommando.proxy.Internal;
 
 import io.lettuce.core.RedisClient;
@@ -24,7 +24,7 @@ public class RedisCommandoUnitTest {
 
     static RedisClient redisClient;
     static RedisCommando rcommando;
-    static DaoSet objs;
+    static Index objs;
 
     @BeforeAll
     public static void setup() {
@@ -143,7 +143,7 @@ public class RedisCommandoUnitTest {
         final AtomicReference<String> change = new AtomicReference<>();
         Subscription subscription = rcommando.subscribe("objs.change", (channel, val) -> change.set(val));
 
-        Optional<SetResult> changes =  obj.set("val", "hello");
+        Optional<Modification> changes =  obj.set("val", "hello");
         Assertions.assertEquals("hello", obj.get("val").asString());
         Assertions.assertTrue(changes.isPresent());
         Assertions.assertEquals("val", changes.get().getChanges().get(0).getField());
@@ -158,7 +158,7 @@ public class RedisCommandoUnitTest {
         Subscription subscription = rcommando.subscribe("objs.change", (channel, val) -> change.set(val));
 
         Dao obj = objs.get("a");
-        Optional<SetResult> changes = obj.set("val", 100);
+        Optional<Modification> changes = obj.set("val", 100);
         Assertions.assertEquals(100, obj.get("val").asInt());
         Assertions.assertTrue(changes.isPresent());
         Assertions.assertEquals("val", changes.get().getChanges().get(0).getField());
@@ -188,7 +188,7 @@ public class RedisCommandoUnitTest {
         Subscription subscription = rcommando.subscribe("objs.change", (channel, val) -> change.set(val));
 
         Dao obj = objs.get("a");
-        Optional<SetResult> changes = obj.set("val", "Hello\nWorld");
+        Optional<Modification> changes = obj.set("val", "Hello\nWorld");
         Assertions.assertEquals("Hello\nWorld", obj.get("val").asString());
         Assertions.assertTrue(changes.isPresent());
         Assertions.assertEquals("val", changes.get().getChanges().get(0).getField());
@@ -205,7 +205,7 @@ public class RedisCommandoUnitTest {
         Subscription subscription = rcommando.subscribe("objs.change", (channel, val) -> change.set(val));
 
         Dao obj = objs.get("a");
-        Optional<SetResult> changes = obj.set("str", "hello", "int", 42);
+        Optional<Modification> changes = obj.set("str", "hello", "int", 42);
         Assertions.assertEquals("hello", obj.get("str").asString());
         Assertions.assertEquals(42, obj.get("int").asInt());
         Assertions.assertEquals(2, changes.get().getChanges().size());
@@ -228,7 +228,7 @@ public class RedisCommandoUnitTest {
         Subscription subscription = rcommando.subscribe("objs.change", (channel, val) -> change.set(val));
 
         Dao obj = objs.get("a");
-        Optional<SetResult> changes = obj.set("_str", "hello", "int", 42);
+        Optional<Modification> changes = obj.set("_str", "hello", "int", 42);
         Assertions.assertEquals("hello", obj.get("_str").asString());
         Assertions.assertEquals(42, obj.get("int").asInt());
         Assertions.assertEquals(2, changes.get().getChanges().size());
@@ -259,7 +259,7 @@ public class RedisCommandoUnitTest {
         subscription.close();
         Assertions.assertEquals("{\"a\":null}", change.get());
         
-        Assertions.assertEquals(0, objs.size());
+        Assertions.assertEquals(0, objs.count());
         Assertions.assertEquals(0, objs.stream().count());
     }
 
@@ -277,7 +277,7 @@ public class RedisCommandoUnitTest {
 
         subscription.close();
         Assertions.assertEquals("{\"b\":null}", change.get());
-        Assertions.assertEquals(1, objs.size());
+        Assertions.assertEquals(1, objs.count());
         Assertions.assertEquals("a", objs.stream().findFirst().get().getId());
     }
 
@@ -294,7 +294,7 @@ public class RedisCommandoUnitTest {
         subscription.close();
         Assertions.assertNull(change.get());
         
-        Assertions.assertEquals(1, objs.size());
+        Assertions.assertEquals(1, objs.count());
         Assertions.assertEquals("a", objs.stream().findFirst().get().getId());
     }
 
@@ -317,7 +317,7 @@ public class RedisCommandoUnitTest {
         Dao obj = objs.get("a");
         obj.set("name", "John Doe");
         obj.set("age", 23);
-        Optional<SetResult> result = obj.clear("age");
+        Optional<Modification> result = obj.clear("age");
         Assertions.assertTrue(result.isPresent());
         Assertions.assertEquals("age", result.get().getChanges().get(0).getField());
         Assertions.assertEquals(23, result.get().getChanges().get(0).getBefore().asInt());
@@ -337,7 +337,7 @@ public class RedisCommandoUnitTest {
         final AtomicReference<String> change = new AtomicReference<>();
         Subscription subscription = rcommando.subscribe("objs.change", (channel, val) -> change.set(val));
 
-        Optional<SetResult> result = obj.clear("field");
+        Optional<Modification> result = obj.clear("field");
         Assertions.assertFalse(result.isPresent());
         subscription.close();
         Assertions.assertNull(change.get());
@@ -403,7 +403,7 @@ public class RedisCommandoUnitTest {
         Assertions.assertIterableEquals(Arrays.asList("a", "b", "c", "d"), rcommando.core().smembers("test").stream().sorted().collect(Collectors.toList()));
     }
     
-    public interface PersonProxy extends DaoProxy {
+    public interface PersonProxy extends Proxy {
     	
     	public static MethodHandles.Lookup createLookup() {
     		return MethodHandles.lookup();

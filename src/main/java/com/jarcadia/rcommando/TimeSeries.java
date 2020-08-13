@@ -2,7 +2,7 @@ package com.jarcadia.rcommando;
 
 import java.util.UUID;
 
-public class TimeSeries extends DaoSet {
+public class TimeSeries extends Index {
 
     protected TimeSeries(RedisCommando rcommando, ValueFormatter formatter, String seriesKey) {
         super(rcommando, formatter, seriesKey);

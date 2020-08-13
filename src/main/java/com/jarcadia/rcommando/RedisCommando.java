@@ -1,6 +1,5 @@
 package com.jarcadia.rcommando;
 
-import java.lang.reflect.Proxy;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -16,10 +15,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jarcadia.rcommando.callbacks.DaoDeleteCallback;
-import com.jarcadia.rcommando.callbacks.DaoInsertCallback;
-import com.jarcadia.rcommando.callbacks.DaoValueChangeCallback;
-import com.jarcadia.rcommando.proxy.DaoProxy;
+import com.jarcadia.rcommando.callbacks.DaoDeletedCallback;
+import com.jarcadia.rcommando.callbacks.DaoInsertedCallback;
+import com.jarcadia.rcommando.callbacks.DaoValueModifiedCallback;
+import com.jarcadia.rcommando.proxy.Proxy;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisNoScriptException;
@@ -38,10 +37,10 @@ public class RedisCommando {
     private final StatefulRedisConnection<String, String> connection;
     private final RedisCommands<String, String> commands;
     private final Map<String, String> scriptCache;
-    private final Map<String, Set<DaoInsertCallback>> insertCallbackMap;
-    private final Map<String, Set<DaoDeleteCallback>> deleteCallbackMap;
-    private final Map<String, Map<String, Set<DaoValueChangeCallback>>> changeCallbackMap;
-    private final Map<Class<? extends DaoProxy>, ProxyMetadata> proxyMetadataMap;
+    private final Map<String, Set<DaoInsertedCallback>> insertCallbackMap;
+    private final Map<String, Set<DaoDeletedCallback>> deleteCallbackMap;
+    private final Map<String, Map<String, Set<DaoValueModifiedCallback>>> changeCallbackMap;
+    private final Map<Class<? extends Proxy>, ProxyMetadata> proxyMetadataMap;
 
     public static RedisCommando create(RedisClient client) {
         return new RedisCommando(client);
@@ -95,20 +94,20 @@ public class RedisCommando {
     }
 
     public Dao getDao(String setKey, String id) {
-        return new DaoSet(this, formatter, setKey).get(id);
+        return new Index(this, formatter, setKey).get(id);
     }
     
-    public <T extends DaoProxy> T getProxy(String setKey, String id, Class<T> proxyClass) {
-        DaoSet set = new DaoSet(this, formatter, setKey);
+    public <T extends Proxy> T getProxy(String setKey, String id, Class<T> proxyClass) {
+        Index set = new Index(this, formatter, setKey);
         return new ProxySet<T>(set, proxyClass).get(id);
     }
         
-    public DaoSet getSetOf(String setKey) {
-        return new DaoSet(this, formatter, setKey);
+    public Index getSetOf(String setKey) {
+        return new Index(this, formatter, setKey);
     }
 
-    public <T extends DaoProxy> ProxySet<T> getSetOf(String setKey, Class<T> proxyClass) {
-        DaoSet set = new DaoSet(this, formatter, setKey);
+    public <T extends Proxy> ProxySet<T> getSetOf(String setKey, Class<T> proxyClass) {
+        Index set = new Index(this, formatter, setKey);
         return new ProxySet<T>(set, proxyClass);
     }
 
@@ -145,58 +144,58 @@ public class RedisCommando {
     }
 
     @SuppressWarnings("unchecked")
-	protected <T extends DaoProxy> T createObjectProxy(Dao object, Class<T> proxyClass) {
+	protected <T extends Proxy> T createObjectProxy(Dao object, Class<T> proxyClass) {
     	ProxyMetadata metadata = proxyMetadataMap.computeIfAbsent(proxyClass, pc -> proxyMetadataFactory.create(pc));
     	ProxyInvocationHandler handler = new ProxyInvocationHandler(object, metadata);
-    	return (T) Proxy.newProxyInstance(this.getClass().getClassLoader(), new Class[] {proxyClass}, handler);
+    	return (T) java.lang.reflect.Proxy.newProxyInstance(this.getClass().getClassLoader(), new Class[] {proxyClass}, handler);
     }
 
-    public void registerObjectInsertCallback(String setKey, DaoInsertCallback handler) {
+    public void registerObjectInsertCallback(String setKey, DaoInsertedCallback handler) {
         this.insertCallbackMap.computeIfAbsent(setKey, k -> ConcurrentHashMap.newKeySet()).add(handler);
     }
 
-    public void registerObjectDeleteCallback(String setKey, DaoDeleteCallback handler) {
+    public void registerObjectDeleteCallback(String setKey, DaoDeletedCallback handler) {
         this.deleteCallbackMap.computeIfAbsent(setKey, k -> ConcurrentHashMap.newKeySet()).add(handler);
     }
 
-    public void registerFieldChangeCallback(String setKey, String fieldName, DaoValueChangeCallback handler) {
-        Map<String, Set<DaoValueChangeCallback>> keyUpdateHandlers = changeCallbackMap.computeIfAbsent(setKey, k-> new ConcurrentHashMap<>());
+    public void registerFieldChangeCallback(String setKey, String fieldName, DaoValueModifiedCallback handler) {
+        Map<String, Set<DaoValueModifiedCallback>> keyUpdateHandlers = changeCallbackMap.computeIfAbsent(setKey, k-> new ConcurrentHashMap<>());
         keyUpdateHandlers.computeIfAbsent(fieldName, k -> ConcurrentHashMap.newKeySet()).add(handler);
     }
 
     protected void invokeObjectInsertCallbacks(Dao dao) {
-        Set<DaoInsertCallback> insertCallbacks = insertCallbackMap.get(dao.getSetKey());
+        Set<DaoInsertedCallback> insertCallbacks = insertCallbackMap.get(dao.getType());
         if (insertCallbacks != null) {
-            for (DaoInsertCallback callback : insertCallbacks) {
+            for (DaoInsertedCallback callback : insertCallbacks) {
                 callback.onInsert(dao);
             }
         }
     }
 
-    protected void invokeChangeCallbacks(SetResult result) {
-        Set<DaoInsertCallback> insertCallbacks = insertCallbackMap.get(result.getDao().getSetKey());
-        Map<String, Set<DaoValueChangeCallback>> changeCallbacksForSet = changeCallbackMap.get(result.getDao().getSetKey());
+    protected void invokeChangeCallbacks(Modification result) {
+        Set<DaoInsertedCallback> insertCallbacks = insertCallbackMap.get(result.getDao().getType());
+        Map<String, Set<DaoValueModifiedCallback>> changeCallbacksForSet = changeCallbackMap.get(result.getDao().getType());
         
         if (insertCallbacks != null && result.isInsert()) {
-            for (DaoInsertCallback callback : insertCallbacks) {
+            for (DaoInsertedCallback callback : insertCallbacks) {
                 callback.onInsert(result.getDao());
             }
         }
 
         if (changeCallbacksForSet != null) {
-            for (Change change : result.getChanges()) {
-                Set<DaoValueChangeCallback> changeCallbacksForField = changeCallbacksForSet.get(change.getField());
+            for (ModifiedValue changedValue : result.getChanges()) {
+                Set<DaoValueModifiedCallback> changeCallbacksForField = changeCallbacksForSet.get(changedValue.getField());
                 if (changeCallbacksForField != null) {
-                    logger.trace("Invoking {} change callbacks for {}.{}", changeCallbacksForField.size(), result.getDao().getSetKey(), change.getField());
-                    for (DaoValueChangeCallback callback : changeCallbacksForField) {
-                        callback.onChange(result.getDao(), change.getField(), change.getBefore(), change.getAfter());
+                    logger.trace("Invoking {} change callbacks for {}.{}", changeCallbacksForField.size(), result.getDao().getType(), changedValue.getField());
+                    for (DaoValueModifiedCallback callback : changeCallbacksForField) {
+                        callback.onChange(result.getDao(), changedValue.getField(), changedValue.getBefore(), changedValue.getAfter());
                     }
                 }
-                Set<DaoValueChangeCallback> changeCallbacksForStar = changeCallbacksForSet.get("*");
+                Set<DaoValueModifiedCallback> changeCallbacksForStar = changeCallbacksForSet.get("*");
                 if (changeCallbacksForStar != null) {
-                    logger.trace("Invoking {} change callbacks for {}.{}", changeCallbacksForStar.size(), result.getDao().getSetKey(), change.getField());
-                    for (DaoValueChangeCallback callback : changeCallbacksForStar) {
-                        callback.onChange(result.getDao(), change.getField(), change.getBefore(), change.getAfter());
+                    logger.trace("Invoking {} change callbacks for {}.{}", changeCallbacksForStar.size(), result.getDao().getType(), changedValue.getField());
+                    for (DaoValueModifiedCallback callback : changeCallbacksForStar) {
+                        callback.onChange(result.getDao(), changedValue.getField(), changedValue.getBefore(), changedValue.getAfter());
                     }
                 }
             }
@@ -204,9 +203,9 @@ public class RedisCommando {
     }
 
     protected void invokeDeleteCallbacks(String setKey, String id) {
-        Set<DaoDeleteCallback> deleteCallbacks = deleteCallbackMap.get(setKey);
+        Set<DaoDeletedCallback> deleteCallbacks = deleteCallbackMap.get(setKey);
         if (deleteCallbacks != null) {
-            for (DaoDeleteCallback callback : deleteCallbacks) {
+            for (DaoDeletedCallback callback : deleteCallbacks) {
                 callback.onDelete(setKey, id);
             }
         }
