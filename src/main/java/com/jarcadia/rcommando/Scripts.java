@@ -4,36 +4,36 @@ package com.jarcadia.rcommando;
 class Scripts {
 	
 	protected static String OBJ_TOUCH = """
-        --Keys setKey, objKey, changeChannelKey
+        --Keys zsetKey, objKey, changeChannelKey
+        --Args score
         local v = redis.call('hincrby', KEYS[2], 'v', 1);
         if (v == 1) then
             local id = string.sub(KEYS[2], string.len(KEYS[1]) + 2);
-            redis.call('sadd', KEYS[1], string.sub(KEYS[2], string.len(KEYS[1]) + 2));
+            redis.call('zadd', KEYS[1], ARGV[1], id);
             redis.call('publish', KEYS[3], '{"' .. id .. '":{"v":' .. v .. '}}');
         end
         return v;
     """;
         
     protected static String OBJ_CHECKED_DELETE = """
-    	--Keys setKey, hashKey, changeChannelKey
-		--Args id
+    	--Keys zsetKey, hashKey, changeChannelKey
 		local removed = redis.call('del', KEYS[2]);
 		if (removed == 1) then 
             local id = string.sub(KEYS[2], string.len(KEYS[1]) + 2);
-			redis.call('srem', KEYS[1], id);
+			redis.call('zrem', KEYS[1], id);
 			redis.call('publish', KEYS[3], '{"' .. id .. '":null}')
 		end
 		return removed;
     """;
     
     protected static String OBJ_SET = """
-        --Keys setKey, hashKey, changeChannelKey
-        --Args field value [field value...] 
+        --Keys zsetKey, hashKey, changeChannelKey
+        --Args score field value [field value...] 
         local changed = false;
         local publish = false;
         local update = {};
         local changes = {};
-        for i=1,#ARGV,2 do
+        for i=2,#ARGV,2 do
             local prev = redis.call('hget', KEYS[2], ARGV[i]);
             if (prev ~= ARGV[i+1]) then
                 redis.call('hset', KEYS[2], ARGV[i], ARGV[i+1]);
@@ -56,8 +56,8 @@ class Scripts {
             -- Add version as first element in response
             table.insert(changes, 1, tostring(ver));
             if (ver == 1) then
-                -- If this is version 1, add to set
-                redis.call('sadd', KEYS[1], id);
+                -- If this is version 1, add to zset
+                redis.call('zadd', KEYS[1], ARGV[1], id);
                 -- Always publish on insert (even if only internal fields were changed - they won't be in the update)
                 publish = true;
             end

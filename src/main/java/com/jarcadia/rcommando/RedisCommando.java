@@ -10,6 +10,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
+import com.jarcadia.rcommando.exception.RedisCommandoException;
+import io.lettuce.core.RedisCommandExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +30,7 @@ import io.lettuce.core.api.sync.RedisCommands;
 public class RedisCommando {
     
     private final Logger logger = LoggerFactory.getLogger(RedisCommando.class);
-    
+
     private final RedisClient redis;
     private final ObjectMapper objectMapper;
     private final ValueFormatter formatter;
@@ -104,10 +106,14 @@ public class RedisCommando {
     public DaoSet getSetOf(String setKey) {
         return new DaoSet(this, formatter, setKey);
     }
-    
+
     public <T extends DaoProxy> ProxySet<T> getSetOf(String setKey, Class<T> proxyClass) {
         DaoSet set = new DaoSet(this, formatter, setKey);
         return new ProxySet<T>(set, proxyClass);
+    }
+
+    public TimeSeries getTimeSeriesOf(String seriesKey) {
+        return new TimeSeries(this, formatter, seriesKey);
     }
 
     public Eval eval() {
@@ -133,6 +139,8 @@ public class RedisCommando {
         } catch (RedisNoScriptException ex) {
         	scriptCache.remove(script);
         	return executeScript(script, outputType, keys, args);
+        } catch (RedisCommandExecutionException ex) {
+            throw new RedisCommandoException("Error executing " + script, ex);
         }
     }
 

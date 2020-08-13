@@ -9,7 +9,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import io.lettuce.core.ScoredValue;
 import io.lettuce.core.StreamScanCursor;
+import io.lettuce.core.output.ScoredValueStreamingChannel;
 import io.lettuce.core.output.ValueStreamingChannel;
 
 public class DaoSet implements Iterable<Dao> {
@@ -29,11 +31,11 @@ public class DaoSet implements Iterable<Dao> {
     }
 
     public long size() {
-        return rcommando.core().scard(setKey);
+        return rcommando.core().zcard(setKey);
     }
 
     public boolean has(String id) {
-        return rcommando.core().sismember(setKey, id);
+        return rcommando.core().zscore(setKey, id) != null;
     }
     
     public Dao get(String id) {
@@ -41,13 +43,14 @@ public class DaoSet implements Iterable<Dao> {
     }
     
     public Dao randomMember() {
-    	String id = rcommando.core().srandmember(setKey);
-    	return id == null ? null : get(id);
+        // TODO make this random
+    	List<String> range = rcommando.core().zrange(setKey, 0, 1);
+    	return range.size() == 0 ? null : get(range.get(0));
     }
 
     @Override
     public Iterator<Dao> iterator() {
-        return new RedisObjectStreamer();
+        return new DaoIterator();
     }
     
     public Stream<Dao> stream() {
@@ -59,16 +62,16 @@ public class DaoSet implements Iterable<Dao> {
     			.collect(Collectors.toSet());
     }
     
-    private class RedisObjectStreamer implements Iterator<Dao> {
+    private class DaoIterator implements Iterator<Dao> {
 
-        private final List<String> buffer;
-        private final ValueStreamingChannel<String> channel;
+        private final List<ScoredValue<String>> buffer;
+        private final ScoredValueStreamingChannel<String> channel;
         private StreamScanCursor cursor;
         
-        public RedisObjectStreamer() {
+        public DaoIterator() {
             this.buffer = new LinkedList<>();
             this.channel = value -> buffer.add(value);
-            this.cursor = rcommando.core().sscan(channel, setKey);
+            this.cursor = rcommando.core().zscan(channel, setKey);
         }
 
         @Override
@@ -78,14 +81,14 @@ public class DaoSet implements Iterable<Dao> {
         	} else if (cursor.isFinished()) {
         		return false;
         	} else {
-                cursor = rcommando.core().sscan(channel, setKey, cursor);
+                cursor = rcommando.core().zscan(channel, setKey, cursor);
                 return this.hasNext();
         	}
         }
 
         @Override
         public Dao next() {
-            return get(buffer.remove(0));
+            return get(buffer.remove(0).getValue());
         }
     }
 }

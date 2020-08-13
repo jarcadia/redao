@@ -55,9 +55,14 @@ public class Dao {
     }
 
     public Optional<SetResult> set(Object... fieldsAndValues) {
+        return this.set(0, fieldsAndValues);
+   }
+
+    public Optional<SetResult> set(long score, Object... fieldsAndValues) {
     	List<String> bulkChanges = rcommando.eval()
                 .cachedScript(Scripts.OBJ_SET)
                 .addKeys(this.setKey, this.hashKey, this.setKey+".change")
+                .addArg(score)
                 .addArgs(prepareArgsAsArray(fieldsAndValues))
                 .returnMulti();
 
@@ -76,7 +81,6 @@ public class Dao {
         } else {
             return Optional.empty();
         }
-
     }
 
     public Optional<SetResult> set(Map<String, Object> properties) {
@@ -95,6 +99,7 @@ public class Dao {
         boolean created = rcommando.eval()
             .cachedScript(Scripts.OBJ_TOUCH)
             .addKeys(this.setKey, this.hashKey, this.setKey + ".change")
+            .addArg(0)
             .returnLong() == 1L;
         if (created) {
             rcommando.invokeObjectInsertCallbacks(this);
@@ -106,7 +111,6 @@ public class Dao {
         int numDeleted = rcommando.eval()
                 .cachedScript(Scripts.OBJ_CHECKED_DELETE)
                 .addKeys(this.setKey, this.hashKey, this.setKey + ".change")
-                .addArgs(this.id)
                 .returnInt();
         
         if (numDeleted == 1) {
