@@ -5,69 +5,52 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.jarcadia</groupId>
-	<artifactId>redis-commando</artifactId>
+	<groupId>dev.jarcadia</groupId>
+	<artifactId>redao</artifactId>
 	<version>1.0-SNAPSHOT</version>
 
-	<name>redis-commando</name>
-	<url>https://jarcadia.com/redis-commando</url>
+	<name>dev</name>
+	<url>https://jarcadia.dev/redao</url>
 
 	<dependencies>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.7.28</version>
+			<version>1.7.30</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-core</artifactId>
-			<version>2.9.10</version>
+			<version>2.11.3</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
-			<version>2.9.10.4</version>
+			<version>2.11.3</version>
 		</dependency>
 		<dependency>
 			<groupId>io.lettuce</groupId>
 			<artifactId>lettuce-core</artifactId>
-			<version>5.1.8.RELEASE</version>
+			<version>6.0.0.RELEASE</version>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter</artifactId>
-			<version>5.5.2</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<version>5.5.2</version>
+			<version>5.7.0</version>
 			<scope>test</scope>
 		</dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
-            <version>3.2.0</version>
+            <version>3.5.13</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
-            <version>1.7.28</version>
+            <version>1.7.30</version>
             <scope>test</scope>
         </dependency>
-        
-        
-        
-<!-- https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-flume-ng -->
-<dependency>
-    <groupId>org.apache.logging.log4j</groupId>
-    <artifactId>log4j-flume-ng</artifactId>
-    <version>2.13.0</version>
-</dependency>
-
-
 	</dependencies>
  	<build>
         <plugins>
@@ -91,7 +74,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.0.0-M4</version>
+                    <version>3.0.0-M5</version>
                     <!-- Enable preview for text blocks (can remove once text blocks are part of language)-->
                     <configuration>
 						<argLine>--enable-preview</argLine>
